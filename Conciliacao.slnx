@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Conciliacao.Api/Conciliacao.Api.csproj" />
+  <Project Path="Conciliacao.Application/Conciliacao.Application.csproj" />
+  <Project Path="Conciliacao.Domain.Tests/Conciliacao.Domain.Tests.csproj" />
+  <Project Path="Conciliacao.Domain/Conciliacao.Domain.csproj" />
+  <Project Path="Conciliacao.Infra/Conciliacao.Infra.csproj" />
+</Solution>
