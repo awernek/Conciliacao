@@ -356,7 +356,7 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 ## 👤 Autor
 
-**André Wernek**
+**Anderson Wernek**
 - GitHub: [@awernek](https://github.com/awernek)
 
 ## 🤝 Contribuindo
