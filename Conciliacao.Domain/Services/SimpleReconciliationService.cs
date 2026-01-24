@@ -1,57 +1,60 @@
 ﻿using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Enums;
-using Conciliacao.Domain.ValueObjects;
+using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Domain.Services
 {
     public class SimpleReconciliationService
     {
-        public bool Match(Transaction transaction, ExternalEntry externalEntry)
+        private readonly IReconciliationPolicy _policy;
+
+        public SimpleReconciliationService(IReconciliationPolicy policy)
         {
-            return transaction.Reference == externalEntry.Reference
-                && transaction.Amount == externalEntry.Amount
-                && transaction.Date == externalEntry.Date;
+            _policy = policy;
         }
 
-        public ReconciliationResult Reconcile(
-            Transaction? transaction,
-            ExternalEntry? externalEntry)
+        public IReadOnlyCollection<ReconciliationItem> Reconcile(
+            IEnumerable<Transaction> transactions,
+            IEnumerable<ExternalEntry> externalEntries)
         {
-            if (transaction == null
-                && externalEntry != null)
+            var results = new List<ReconciliationItem>();
+            var matchedExternalEntries = new HashSet<ExternalEntry>();
+
+            foreach (var transaction in transactions)
             {
-                return ReconciliationResult.Extra;
+                var match = externalEntries
+                    .FirstOrDefault(e => _policy.IsMatch(transaction, e));
+
+                if (match != null)
+                {
+                    results.Add(new ReconciliationItem(
+                        transaction,
+                        match,
+                        ReconciliationResult.Matched));
+
+                    matchedExternalEntries.Add(match);
+                }
+                else
+                {
+                    results.Add(new ReconciliationItem(
+                        transaction,
+                        null,
+                        ReconciliationResult.Missing));
+                }
             }
 
-            if (transaction != null
-                && externalEntry == null)
+            foreach (var external in externalEntries)
             {
-                return ReconciliationResult.Missing;
+                if (!matchedExternalEntries.Contains(external))
+                {
+                    results.Add(new ReconciliationItem(
+                        null,
+                        external,
+                        ReconciliationResult.Extra));
+                }
             }
 
-            if (Match(transaction!, externalEntry!))
-            {
-                return ReconciliationResult.Matched;
-            }
-
-            return ReconciliationResult.Divergent;
-        }
-
-        public bool MatchWithTolerance(
-            Transaction transaction,
-            ExternalEntry externalEntry,
-            decimal tolerance)
-        {
-            if (transaction.Reference != externalEntry.Reference)
-                return false;
-
-            if (transaction.Date.Date != externalEntry.Date.Date)
-                return false;
-
-            var transactionMoney = new Money(transaction.Amount);
-            var externalEntryMoney = new Money(externalEntry.Amount);
-
-            return transactionMoney.Equals(externalEntryMoney, tolerance);
+            return results;
         }
     }
 }

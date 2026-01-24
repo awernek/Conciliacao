@@ -1,34 +1,48 @@
 ﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Enums;
+using Conciliacao.Domain.Policies;
 using Conciliacao.Domain.Services;
 
 namespace Conciliacao.Domain.Tests
 {
-    public class SimpleReconciliationServiceTests
+    public class SimpleReconciliationBatchTests
     {
         [Fact]
-        public void MatchWithTolerance_Should_Return_True_When_Difference_Is_Within_Tolerance()
+        public void Reconcile_Should_Classify_Matched_Missing_And_Extra()
         {
-            var service = new SimpleReconciliationService();
+            var policy = new DefaultReconciliationPolicy(0.05m);
+            var service = new SimpleReconciliationService(policy);
 
-            var transaction = new Transaction
+            var transactions = new[]
             {
-                Reference = "ABC123",
-                Amount = 100.00m,
-                Date = new DateTime(2025, 1, 10)
+                new Transaction
+                {
+                    Reference = "T1",
+                    Amount = 100m,
+                    Date = new DateTime(2025, 1, 10)
+                }
             };
 
-            var externalEntry = new ExternalEntry
+            var externalEntries = new[]
             {
-                Reference = "ABC123",
-                Amount = 99.98m,
-                Date = new DateTime(2025, 1, 10)
+                new ExternalEntry
+                {
+                    Reference = "T1",
+                    Amount = 100m,
+                    Date = new DateTime(2025, 1, 10)
+                },
+                new ExternalEntry
+                {
+                    Reference = "T2",
+                    Amount = 50m,
+                    Date = new DateTime(2025, 1, 10)
+                }
             };
 
-            var tolerance = 0.05m;
+            var result = service.Reconcile(transactions, externalEntries);
 
-            var result = service.MatchWithTolerance(transaction, externalEntry, tolerance);
-
-            Assert.True(result);
+            Assert.Contains(result, r => r.Result == ReconciliationResult.Matched);
+            Assert.Contains(result, r => r.Result == ReconciliationResult.Extra);
         }
     }
 }
