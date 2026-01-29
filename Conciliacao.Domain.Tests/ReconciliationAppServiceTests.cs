@@ -1,6 +1,6 @@
 ﻿using Conciliacao.Application.Services;
 using Conciliacao.Domain.Entities;
-using Conciliacao.Domain.Policies;
+using Conciliacao.Domain.Tests;
 
 namespace Conciliacao.Application.Tests
 {
@@ -9,8 +9,9 @@ namespace Conciliacao.Application.Tests
         [Fact]
         public void ReconcileBatch_Should_Match_When_Entries_Are_Equal()
         {
-            var policy = new DefaultReconciliationPolicy(0.05m);
-            var service = new ReconciliationAppService(policy);
+            var factory = new FakeReconciliationPolicyFactory();
+            var service = new ReconciliationAppService(factory);
+            var client = new Client { Code = "CLIENT_TEST" };
 
             var transactions = new List<Transaction>
             {
@@ -32,7 +33,7 @@ namespace Conciliacao.Application.Tests
                 }
             };
 
-            var result = service.ReconcileBatch(transactions, externalEntries);
+            var result = service.ReconcileBatch(client, transactions, externalEntries);
 
             Assert.Single(result.Matched);
             Assert.Empty(result.Divergent);
