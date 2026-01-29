@@ -1,4 +1,5 @@
-﻿using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,7 +17,7 @@ namespace Conciliacao.Api.Controllers
         }
 
         [HttpPost("batch")]
-        [ProducesResponseType(typeof(ReconciliationBatchResultDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ReconciliationBatchResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult ReconcileBatch(
             [FromBody] ReconciliationBatchRequestDto request)

@@ -1,4 +1,5 @@
-﻿using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Mappers;
 using Conciliacao.Domain.Entities;
@@ -14,7 +15,7 @@ namespace Conciliacao.Application.Services
             _policyFactory = policyFactory;
         }
 
-        public ReconciliationBatchResultDto ReconcileBatch(
+        public ReconciliationBatchResponseDto ReconcileBatch(
             ReconciliationBatchRequestDto request)
         {
             // Validação mínima de caso de uso
@@ -42,12 +43,24 @@ namespace Conciliacao.Application.Services
             var domainResult = internalService.Execute(transactions, externalEntries);
 
             // 5️⃣ Mapping Domain → DTO
-            return new ReconciliationBatchResultDto
+            return new ReconciliationBatchResponseDto
             {
-                Matched = domainResult.Matched.Count,
-                Divergent = domainResult.Divergent.Count,
-                Missing = domainResult.Missing.Count,
-                Extra = domainResult.Extra.Count
+                Matched = domainResult.Matched
+                    .Select(p => new MatchedPairDto
+                    {
+                        Transaction = ReconciliationMapper.ToDto(p.Transaction),
+                        ExternalEntry = ReconciliationMapper.ToDto(p.ExternalEntry)
+                    })
+                    .ToList(),
+                Divergent = domainResult.Divergent
+                    .Select(p => new DivergenceDto
+                    {
+                        Transaction = ReconciliationMapper.ToDto(p.Transaction),
+                        ExternalEntry = ReconciliationMapper.ToDto(p.ExternalEntry)
+                    })
+                    .ToList(),
+                Missing = domainResult.Missing.Select(ReconciliationMapper.ToDto).ToList(),
+                Extra = domainResult.Extra.Select(ReconciliationMapper.ToDto).ToList()
             };
         }
     }

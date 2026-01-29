@@ -1,4 +1,4 @@
-﻿using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs;
 using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Services;
 using Conciliacao.Domain.Tests;
@@ -43,10 +43,10 @@ namespace Conciliacao.Application.Tests
             var result = service.ReconcileBatch(request);
 
             // Assert
-            Assert.Equal(1, result.Matched);
-            Assert.Equal(0, result.Divergent);
-            Assert.Equal(0, result.Missing);
-            Assert.Equal(0, result.Extra);
+            Assert.Single(result.Matched);
+            Assert.Empty(result.Divergent);
+            Assert.Empty(result.Missing);
+            Assert.Empty(result.Extra);
         }
     }
 }

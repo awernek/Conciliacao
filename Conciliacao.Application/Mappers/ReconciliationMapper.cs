@@ -1,4 +1,4 @@
-﻿using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Application.Mappers
@@ -19,6 +19,22 @@ namespace Conciliacao.Application.Mappers
                 Reference = dto.Reference,
                 Amount = dto.Amount,
                 Date = dto.Date
+            };
+
+        public static TransactionDto ToDto(Transaction entity)
+            => new TransactionDto
+            {
+                Reference = entity.Reference,
+                Amount = entity.Amount,
+                Date = entity.Date
+            };
+
+        public static ExternalEntryDto ToDto(ExternalEntry entity)
+            => new ExternalEntryDto
+            {
+                Reference = entity.Reference,
+                Amount = entity.Amount,
+                Date = entity.Date
             };
     }
 }

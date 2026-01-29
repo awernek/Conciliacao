@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="Conciliacao.Api.Tests/Conciliacao.Api.Tests.csproj" />
   <Project Path="Conciliacao.Api/Conciliacao.Api.csproj" />
   <Project Path="Conciliacao.Application/Conciliacao.Application.csproj" />
   <Project Path="Conciliacao.Domain.Tests/Conciliacao.Domain.Tests.csproj" />
