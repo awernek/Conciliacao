@@ -30,7 +30,7 @@ namespace Conciliacao.Application.Services
         {
             var result = new ReconciliationBatchResult();
 
-            //Indexa entradas exter por Reference
+            // Indexa entradas exter por Reference
             var externalByReference = externalEntries
                 .GroupBy(e => e.Reference)
                 .ToDictionary(g => g.Key, g => g.First());
@@ -40,7 +40,7 @@ namespace Conciliacao.Application.Services
 
             foreach (var transaction in transactions)
             {
-                if(!externalByReference.TryGetValue(transaction.Reference, out var external))
+                if (!externalByReference.TryGetValue(transaction.Reference, out var external))
                 {
                     // Existe internamente, mas não externamente
                     result.Missing.Add(transaction);
@@ -51,7 +51,7 @@ namespace Conciliacao.Application.Services
                 usedExternalReferences.Add(external.Reference);
 
                 // Aplica a policy
-                if(_policy.IsMatch(transaction, external))
+                if (_policy.IsMatch(transaction, external))
                 {
                     result.Matched.Add((transaction, external));
                 }
@@ -61,9 +61,9 @@ namespace Conciliacao.Application.Services
                 }
 
                 // Tudo que sobrou do lado externo é Extra
-                foreach(var externalEntrie in externalEntries)
+                foreach (var externalEntrie in externalEntries)
                 {
-                    if(!usedExternalReferences.Contains(externalEntrie.Reference))
+                    if (!usedExternalReferences.Contains(externalEntrie.Reference))
                     {
                         result.Extra.Add(externalEntrie);
                     }
