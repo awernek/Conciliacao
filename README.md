@@ -10,6 +10,8 @@ Sistema de reconciliação automatizada de transações financeiras, construído
 - [Visão Geral](#-visão-geral)
 - [Arquitetura](#-arquitetura)
 - [Modelo de Domínio](#-modelo-de-domínio)
+- [Camada de Aplicação](#-camada-de-aplicação)
+- [Políticas e Regras](#-políticas-e-regras)
 - [Fluxo de Reconciliação](#-fluxo-de-reconciliação)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Quick Start](#-quick-start)
@@ -20,15 +22,16 @@ Sistema de reconciliação automatizada de transações financeiras, construído
 
 ## 🎯 Visão Geral
 
-O Sistema de Conciliação Financeira automatiza o processo de reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways de pagamento, APIs). Utilizando estratégias configuráveis de matching, o sistema identifica transações correspondentes, detecta divergências e destaca lançamentos extras ou faltantes.
+O Sistema de Conciliação Financeira automatiza a reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways, APIs). Oferece **dois pontos de entrada**: um serviço de domínio que retorna itens de conciliação individuais e um serviço de aplicação que retorna resultados em lote com listas tipadas (Matched, Divergent, Missing, Extra).
 
 ### Principais Funcionalidades
 
-- ✅ Matching automático de transações com base em regras configuráveis
-- ✅ Comparação monetária com tolerância para diferenças de arredondamento
-- ✅ Identificação de transações matched, missing e extra
-- ✅ Arquitetura extensível baseada em Strategy Pattern
-- ✅ Testes unitários com cobertura completa
+- ✅ **Duas APIs de reconciliação**: Domain (`SimpleReconciliationService`) e Application (`ReconciliationAppService`)
+- ✅ **Resultado em lote**: `ReconciliationBatchResult` com listas separadas para Matched, Divergent, Missing e Extra
+- ✅ **Políticas composáveis**: regras atômicas (`IReconciliationRule`) combinadas via `CompositeReconciliationPolicy`
+- ✅ **Regras reutilizáveis**: ReferenceMatchRule, DateMatchRule, AmountToleranceRule
+- ✅ **Comparação monetária** com tolerância (Value Object `Money`)
+- ✅ **Testes** para Domain, Application e Rules
 
 ## 🏗️ Arquitetura
 
@@ -39,56 +42,54 @@ O Sistema de Conciliação Financeira automatiza o processo de reconciliação e
 │                      SISTEMA DE CONCILIAÇÃO                             │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│    ┌──────────┐         ┌──────────────────┐         ┌───────────┐    │
-│    │ Sistema  │         │                  │         │  Bancos   │    │
-│    │ Interno  │────────▶│  Reconciliation  │◀────────│  ERPs     │    │
-│    │(ERP/Core)│         │     Engine       │         │  Gateways │    │
-│    └──────────┘         │                  │         └───────────┘    │
-│          │              └──────────────────┘               │           │
-│          │                       │                         │           │
-│          │                       │                         │           │
-│    ┌──────────┐         ┌──────────────────┐     ┌──────────────┐    │
-│    │Transactions│        │ReconciliationItems│    │ExternalEntries│   │
-│    └──────────┘         │  ┌──────────────┐│     └──────────────┘    │
-│                         │  │Match│Miss│Extra││                        │
-│                         │  └──────────────┘│                         │
-│                         └──────────────────┘                         │
-│                                                                         │
+│    ┌──────────┐         ┌──────────────────┐         ┌───────────┐       │
+│    │ Sistema  │         │                  │         │  Bancos   │       │
+│    │ Interno  │────────▶│  Reconciliation  │◀────────│  ERPs     │       │
+│    │(ERP/Core)│         │     Engine       │         │  Gateways │       │
+│    └──────────┘         └──────────────────┘         └───────────┘       │
+│          │                       │                         │             │
+│          ▼                       ▼                         ▼             │
+│    ┌──────────┐         ┌──────────────────┐     ┌──────────────┐       │
+│    │Transactions│        │BatchResult /     │     │ExternalEntries│      │
+│    └──────────┘         │ReconciliationItem│     └──────────────┘       │
+│                         │ Matched|Divergent|Missing|Extra                 │
+│                         └──────────────────┘                             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Arquitetura em Camadas
 
 ```
-┌───────────────────────────────────────────────────────┐
-│              API Layer (ASP.NET Core)                 │
-│                 [Em desenvolvimento]                  │
-├───────────────────────────────────────────────────────┤
-│              Application Layer                        │
-│        Orquestração e Casos de Uso                    │
-├───────────────────────────────────────────────────────┤
-│                 Domain Layer                          │
-│  ┌─────────┐  ┌─────────┐  ┌──────────────────┐     │
-│  │Entities │  │  Value  │  │    Services      │     │
-│  │         │  │ Objects │  │                  │     │
-│  │Transaction  │  Money  │  │SimpleReconciliation   │
-│  │ExternalEntry│         │  │     Service      │     │
-│  │Reconciliation│        │  │                  │     │
-│  │   Item   │  │         │  │                  │     │
-│  └─────────┘  └─────────┘  └──────────────────┘     │
-│                                  │                    │
-│  ┌───────────────────────────────────────────────┐   │
-│  │              Policies                         │   │
-│  │  ┌──────────────────┐  ┌──────────────────┐  │   │
-│  │  │IReconciliationPolicy││DefaultReconciliation│ │   │
-│  │  │   (interface)    │  │     Policy       │  │   │
-│  │  └──────────────────┘  └──────────────────┘  │   │
-│  └───────────────────────────────────────────────┘   │
-├───────────────────────────────────────────────────────┤
-│            Infrastructure Layer                       │
-│              [Em desenvolvimento]                     │
-│        Database Access, External APIs, etc.           │
-└───────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    API Layer (ASP.NET Core)                             │
+│                    Controllers, OpenAPI                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                    Application Layer                                     │
+│  ┌─────────────────────────────┐  ┌─────────────────────────────────┐   │
+│  │ ReconciliationAppService    │  │ ReconciliationBatchResult       │   │
+│  │ • Reconcile(tx, ext)        │  │ • Matched, Divergent            │   │
+│  │ • ReconcileBatch(txs, exts) │  │ • Missing, Extra                 │   │
+│  └─────────────────────────────┘  └─────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                         Domain Layer                                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────────┐  │
+│  │  Entities   │  │   Value     │  │ SimpleReconciliationService      │  │
+│  │ Transaction │  │   Objects   │  │ • Reconcile() → ReconciliationItem[]│
+│  │ ExternalEntry│  │   Money     │  └─────────────────────────────────┘  │
+│  │ReconciliationItem│           │                                        │
+│  └─────────────┘  └─────────────┘  ┌─────────────────────────────────┐  │
+│                                    │ Policies                          │  │
+│  ┌─────────────────────────────────▼─────────────────────────────────┐  │
+│  │ IReconciliationPolicy          IReconciliationRule                │  │
+│  │   • IsMatch(tx, ext)             • IsSatisfied(tx, ext)           │  │
+│  │   DefaultReconciliationPolicy    ReferenceMatchRule               │  │
+│  │   CompositeReconciliationPolicy  DateMatchRule                    │  │
+│  │                                   AmountToleranceRule             │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                   Infrastructure Layer                                   │
+│                        [Em desenvolvimento]                              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 📊 Modelo de Domínio
@@ -124,9 +125,9 @@ classDiagram
     class ReconciliationResult {
         <<enumeration>>
         Matched
+        Divergent
         Missing
         Extra
-        Divergent
     }
     
     class IReconciliationPolicy {
@@ -134,241 +135,300 @@ classDiagram
         +IsMatch(Transaction, ExternalEntry) bool
     }
     
+    class IReconciliationRule {
+        <<interface>>
+        +IsSatisfied(Transaction, ExternalEntry) bool
+    }
+    
     class DefaultReconciliationPolicy {
         -decimal tolerance
     }
     
-    class SimpleReconciliationService {
-        +Reconcile(transactions, entries) ReconciliationItem[]
+    class CompositeReconciliationPolicy {
+        -IEnumerable~IReconciliationRule~ rules
     }
     
-    SimpleReconciliationService --> IReconciliationPolicy : usa
+    class ReferenceMatchRule
+    class DateMatchRule
+    class AmountToleranceRule
+    
+    class SimpleReconciliationService {
+        +Reconcile(transactions, entries) IReadOnlyCollection~ReconciliationItem~
+    }
+    
+    class ReconciliationAppService {
+        +Reconcile(tx, ext) ReconciliationResult
+        +ReconcileBatch(txs, exts) ReconciliationBatchResult
+    }
+    
+    class ReconciliationBatchResult {
+        +List~Matched~ Matched
+        +List~Divergent~ Divergent
+        +List~Transaction~ Missing
+        +List~ExternalEntry~ Extra
+    }
+    
+    SimpleReconciliationService --> IReconciliationPolicy
+    ReconciliationAppService --> IReconciliationPolicy
     DefaultReconciliationPolicy ..|> IReconciliationPolicy
-    DefaultReconciliationPolicy --> Money : compara valores
-    ReconciliationItem --> ReconciliationResult
+    CompositeReconciliationPolicy ..|> IReconciliationPolicy
+    CompositeReconciliationPolicy --> IReconciliationRule : compõe
+    ReferenceMatchRule ..|> IReconciliationRule
+    DateMatchRule ..|> IReconciliationRule
+    AmountToleranceRule ..|> IReconciliationRule
+    AmountToleranceRule --> Money
 ```
+
+## 📦 Camada de Aplicação
+
+A camada de aplicação expõe o **ReconciliationAppService**, pensado para orquestração e consumo por API ou UI.
+
+| Método | Descrição | Retorno |
+|--------|-----------|---------|
+| `Reconcile(Transaction, ExternalEntry)` | Concilia um par | `ReconciliationResult` (Matched ou Divergent) |
+| `ReconcileBatch(IEnumerable<Transaction>, IEnumerable<ExternalEntry>)` | Concilia lotes | `ReconciliationBatchResult` |
+
+### ReconciliationBatchResult
+
+Agrupa os resultados em listas tipadas, facilitando relatórios e tratamento por tipo:
+
+- **Matched** — pares (Transaction, ExternalEntry) que passaram na política
+- **Divergent** — pares com mesma referência mas que não passaram (ex.: valor diferente)
+- **Missing** — transações internas sem correspondente externo
+- **Extra** — entradas externas sem correspondente interno
+
+O batch usa **indexação por Reference** para encontrar o externo correspondente a cada transação, e marca referências já usadas para classificar Extra ao final.
+
+## 🔧 Políticas e Regras
+
+Existem duas formas de definir quando uma transação e uma entrada externa “batem”:
+
+### 1. Política única: DefaultReconciliationPolicy
+
+Implementação monolítica de `IReconciliationPolicy`: referência igual, mesma data (dia) e valor dentro da tolerância.
+
+```csharp
+var policy = new DefaultReconciliationPolicy(tolerance: 0.01m);
+```
+
+### 2. Políticas composáveis: IReconciliationRule + CompositeReconciliationPolicy
+
+Regras atômicas implementam `IReconciliationRule`; o **CompositeReconciliationPolicy** exige que **todas** as regras sejam satisfeitas.
+
+| Regra | Descrição |
+|-------|-----------|
+| **ReferenceMatchRule** | `transaction.Reference == externalEntry.Reference` |
+| **DateMatchRule** | Mesmo dia (ignora hora) |
+| **AmountToleranceRule** | Valor dentro da tolerância (usa `Money`) |
+
+```csharp
+var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
+{
+    new ReferenceMatchRule(),
+    new DateMatchRule(),
+    new AmountToleranceRule(tolerance: 0.01m)
+});
+```
+
+Tanto `SimpleReconciliationService` quanto `ReconciliationAppService` recebem `IReconciliationPolicy`, então aceitam qualquer uma das duas abordagens.
 
 ## 🔄 Fluxo de Reconciliação
 
-### Visão Geral do Processo
+### Domain: SimpleReconciliationService
 
 ```
-       ENTRADA                    PROCESSAMENTO                    SAÍDA
-┌─────────────────┐                                        ┌─────────────────┐
-│  Transactions   │──┐                                   ┌─▶│    Matched      │
-│ (Sistema Int.)  │  │   ┌─────────────────────────┐    │  │  tx ↔ ext OK    │
-└─────────────────┘  │   │                         │    │  └─────────────────┘
-                     ├──▶│SimpleReconciliation     │────┤
-┌─────────────────┐  │   │       Service           │    │  ┌─────────────────┐
-│ExternalEntries  │──┘   │                         │    ├─▶│    Missing      │
-│(Bancos, APIs)   │      │ ┌─────────────────────┐ │    │  │  tx sem ext     │
-└─────────────────┘      │ │IReconciliationPolicy│ │    │  └─────────────────┘
-                         │ │                     │ │    │
-                         │ │ • Reference match   │ │    │  ┌─────────────────┐
-                         │ │ • Date match        │ │    └─▶│     Extra       │
-                         │ │ • Amount ± tolerance│ │       │  ext sem tx     │
-                         │ └─────────────────────┘ │       └─────────────────┘
-                         └─────────────────────────┘
+Para cada Transaction → busca primeiro ExternalEntry onde Policy.IsMatch(tx, ext)
+  → se encontrou: ReconciliationItem(tx, ext, Matched)
+  → senão: ReconciliationItem(tx, null, Missing)
+Para cada ExternalEntry não usada → ReconciliationItem(null, ext, Extra)
+Retorno: IReadOnlyCollection<ReconciliationItem>
 ```
 
-### Algoritmo de Matching
+### Application: ReconciliationAppService.ReconcileBatch
 
 ```
-PARA CADA transaction em Transactions:
-    match ← Buscar ExternalEntry onde Policy.IsMatch(tx, ext) = true
-    
-    SE match encontrado:
-        Adicionar ReconciliationItem(tx, match, MATCHED)
-        Marcar match como usado
-    SENÃO:
-        Adicionar ReconciliationItem(tx, null, MISSING)
-
-PARA CADA externalEntry não usado:
-    Adicionar ReconciliationItem(null, ext, EXTRA)
-
-RETORNAR lista de ReconciliationItems
+Indexar ExternalEntries por Reference
+Para cada Transaction:
+  se não existe externo com mesma Reference → Missing.Add(transaction)
+  senão:
+    marcar referência como usada
+    se Policy.IsMatch(tx, ext) → Matched.Add((tx, ext))
+    senão → Divergent.Add((tx, ext))
+Para cada ExternalEntry cuja Reference não foi usada → Extra.Add(ext)
+Retorno: ReconciliationBatchResult
 ```
 
-### Critérios de Match (DefaultReconciliationPolicy)
-
-| Critério | Regra |
-|----------|-------|
-| **Reference** | Exatamente igual |
-| **Date** | Mesmo dia (ignora hora) |
-| **Amount** | Diferença ≤ tolerância |
+A diferença principal é que o **AppService** assume correspondência por referência (um externo por referência) e separa **Divergent** (mesma ref, mas sem match na política) de **Missing** (sem ref externa).
 
 ## 📁 Estrutura do Projeto
 
 ```
 Conciliacao/
-├── Conciliacao.Api/              # Web API (ASP.NET Core)
-├── Conciliacao.Application/      # Casos de uso e orquestração
-├── Conciliacao.Domain/           # Núcleo do domínio
+├── Conciliacao.Api/                    # Web API (ASP.NET Core, OpenAPI)
+├── Conciliacao.Application/            # Casos de uso e orquestração
+│   ├── Models/
+│   │   └── ReconciliationBatchResult.cs
+│   └── Services/
+│       └── ReconciliationAppService.cs
+├── Conciliacao.Domain/                 # Núcleo do domínio
 │   ├── Entities/
-│   │   ├── Transaction.cs        # Transação interna
-│   │   ├── ExternalEntry.cs      # Entrada externa (banco, gateway)
-│   │   └── ReconciliationItem.cs # Resultado da conciliação
+│   │   ├── Transaction.cs
+│   │   ├── ExternalEntry.cs
+│   │   └── ReconciliationItem.cs
 │   ├── ValueObjects/
-│   │   └── Money.cs              # Comparação monetária c/ tolerância
+│   │   └── Money.cs
 │   ├── Enums/
 │   │   └── ReconciliationResult.cs
 │   ├── Policies/
 │   │   ├── IReconciliationPolicy.cs
-│   │   └── DefaultReconciliationPolicy.cs
+│   │   ├── IReconciliationRule.cs
+│   │   ├── DefaultReconciliationPolicy.cs
+│   │   ├── CompositeReconciliationPolicy.cs
+│   │   ├── ReferenceMatchRule.cs
+│   │   ├── DateMatchRule.cs
+│   │   └── AmountToleranceRule.cs
 │   └── Services/
 │       └── SimpleReconciliationService.cs
-├── Conciliacao.Infra/            # Persistência e integrações
-└── Conciliacao.Domain.Tests/     # Testes unitários
+├── Conciliacao.Infra/                  # Persistência e integrações
+└── Conciliacao.Domain.Tests/           # Testes
+    ├── SimpleReconciliationServiceTests.cs
+    ├── ReconciliationAppServiceTests.cs
+    ├── DefaultReconciliationPolicyTests.cs
+    ├── MoneyTests.cs
+    └── Policies/
+        └── Rules/
+            ├── ReferenceMatchRuleTests.cs
+            ├── DateMatchRuleTests.cs
+            └── AmountToleranceRuleTests.cs
 ```
 
 ## 🚀 Quick Start
 
 ### Pré-requisitos
 
-- .NET 10 SDK
-- Git
+- .NET 10 SDK  
+- Git  
 
 ### Instalação e Execução
 
 ```bash
-# Clone o repositório
 git clone https://github.com/awernek/Conciliacao.git
 cd Conciliacao
-
-# Restaurar dependências e compilar
 dotnet build
-
-# Executar testes
 dotnet test
-
-# Executar a aplicação (quando disponível)
 dotnet run --project Conciliacao.Api
 ```
 
-### Exemplo de Uso
+### Exemplo: Domain (itens de conciliação)
 
 ```csharp
 using Conciliacao.Domain.Policies;
 using Conciliacao.Domain.Services;
-using Conciliacao.Domain.Enums;
 
-// 1. Configurar a política de reconciliação
 var policy = new DefaultReconciliationPolicy(tolerance: 0.01m);
-
-// 2. Criar o serviço de reconciliação
 var service = new SimpleReconciliationService(policy);
-
-// 3. Executar a reconciliação
 var results = service.Reconcile(transactions, externalEntries);
 
-// 4. Analisar resultados
-var matched = results.Count(r => r.Result == ReconciliationResult.Matched);
-var missing = results.Count(r => r.Result == ReconciliationResult.Missing);
-var extra   = results.Count(r => r.Result == ReconciliationResult.Extra);
+foreach (var item in results)
+    Console.WriteLine($"{item.Result}: {item.Transaction?.Reference} / {item.ExternalEntry?.Reference}");
+```
 
-Console.WriteLine($"Matched: {matched}, Missing: {missing}, Extra: {extra}");
+### Exemplo: Application (lote com listas)
+
+```csharp
+using Conciliacao.Application.Services;
+using Conciliacao.Domain.Policies;
+
+var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
+{
+    new ReferenceMatchRule(),
+    new DateMatchRule(),
+    new AmountToleranceRule(0.01m)
+});
+var appService = new ReconciliationAppService(policy);
+var result = appService.ReconcileBatch(transactions, externalEntries);
+
+Console.WriteLine($"Matched: {result.Matched.Count}, Divergent: {result.Divergent.Count}");
+Console.WriteLine($"Missing: {result.Missing.Count}, Extra: {result.Extra.Count}");
 ```
 
 ## 💡 Decisões de Design
 
 | Decisão | Motivação |
 |---------|-----------|
-| **Strategy Pattern** (Policies) | Permite trocar regras de matching sem alterar o serviço principal. Facilita a adição de novas políticas de reconciliação. |
-| **Value Object Money** | Encapsula comparação monetária com tolerância, evitando erros comuns de ponto flutuante e centralizando lógica de comparação. |
-| **Imutabilidade em ReconciliationItem** | Resultados são read-only após criação, garantindo consistência e facilitando debugging. |
-| **HashSet para tracking** | Complexidade O(1) para verificar entries já usados, otimizando performance em grandes volumes. |
-| **Separação Transaction/ExternalEntry** | Origens distintas = entidades distintas. Respeita bounded contexts e facilita evolução independente. |
-| **Interface IReconciliationPolicy** | Inversão de dependência (SOLID), permitindo injeção de diferentes estratégias sem acoplamento. |
+| **Dois serviços** (Domain + Application) | Domain retorna itens genéricos; Application retorna DTO em lote (Matched/Divergent/Missing/Extra) para relatórios e APIs. |
+| **IReconciliationRule + CompositeReconciliationPolicy** | Regras atômicas e composição permitem combinar critérios sem alterar o core. |
+| **ReconciliationBatchResult com listas tipadas** | Facilita consumo por tipo (ex.: só Missing, só Divergent) e relatórios. |
+| **Indexação por Reference no batch** | AppService assume uma entrada externa por referência; lookup O(1) por transação. |
+| **Divergent explícito** | Diferencia “existe externo com mesma ref, mas não passou na política” de “não existe externo”. |
+| **Value Object Money** | Centraliza comparação com tolerância e evita erros de ponto flutuante. |
+| **Strategy (IReconciliationPolicy)** | Domain e Application dependem da abstração; Default e Composite são intercambiáveis. |
 
 ## 🔧 Extensibilidade
 
-### Criando Políticas Customizadas
+### Nova regra (composite)
 
-Implemente a interface `IReconciliationPolicy` para criar regras de matching personalizadas:
+```csharp
+public class SourceWhitelistRule : IReconciliationRule
+{
+    private readonly HashSet<string> _allowedSources;
+    public SourceWhitelistRule(params string[] sources) 
+        => _allowedSources = new HashSet<string>(sources);
+
+    public bool IsSatisfied(Transaction tx, ExternalEntry ext)
+        => _allowedSources.Contains(ext.Source);
+}
+
+// Uso
+var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
+{
+    new ReferenceMatchRule(),
+    new DateMatchRule(),
+    new AmountToleranceRule(0.01m),
+    new SourceWhitelistRule("Bank", "Gateway")
+});
+```
+
+### Política customizada (monolítica)
 
 ```csharp
 public class StrictPolicy : IReconciliationPolicy
 {
     public bool IsMatch(Transaction tx, ExternalEntry ext)
-    {
-        return tx.Reference == ext.Reference 
-            && tx.Date.Date == ext.Date.Date 
-            && tx.Amount == ext.Amount; // Sem tolerância
-    }
-}
-```
-
-### Exemplo: Política com Fuzzy Matching
-
-```csharp
-public class FuzzyReferencePolicy : IReconciliationPolicy
-{
-    private readonly decimal _tolerance;
-    private readonly int _levenshteinThreshold;
-
-    public FuzzyReferencePolicy(decimal tolerance = 0.01m, int levenshteinThreshold = 3)
-    {
-        _tolerance = tolerance;
-        _levenshteinThreshold = levenshteinThreshold;
-    }
-
-    public bool IsMatch(Transaction tx, ExternalEntry ext)
-    {
-        var referenceMatch = LevenshteinDistance(tx.Reference, ext.Reference) 
-                             <= _levenshteinThreshold;
-        var dateMatch = tx.Date.Date == ext.Date.Date;
-        var amountMatch = Math.Abs(tx.Amount - ext.Amount) <= _tolerance;
-
-        return referenceMatch && dateMatch && amountMatch;
-    }
-
-    private int LevenshteinDistance(string s1, string s2) 
-    {
-        // Implementação do algoritmo de Levenshtein
-        // ...
-    }
+        => tx.Reference == ext.Reference
+           && tx.Date.Date == ext.Date.Date
+           && tx.Amount == ext.Amount;
 }
 ```
 
 ## 🗺️ Roadmap
 
-### Versão 1.0
-- [ ] API REST completa com endpoints CRUD
+- [ ] API REST com endpoints de reconciliação (uso do ReconciliationAppService)
 - [ ] Persistência com Entity Framework Core
-- [ ] Documentação OpenAPI/Swagger
-- [ ] Containerização com Docker
-
-### Versão 2.0
-- [ ] Suporte multi-moeda com conversão automática
-- [ ] Processamento assíncrono com mensageria (RabbitMQ/Kafka)
-- [ ] Dashboard interativo de visualização
-- [ ] Exportação de relatórios (PDF, Excel)
-
-### Versão 3.0
-- [ ] Machine Learning para sugestões de matching
-- [ ] Auditoria completa de alterações
-- [ ] Notificações em tempo real
-- [ ] Integração com sistemas externos via webhooks
+- [ ] Documentação OpenAPI completa
+- [ ] Suporte multi-moeda
+- [ ] Processamento assíncrono (mensageria)
+- [ ] Dashboard e exportação de relatórios
 
 ## 📄 Licença
 
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+Este projeto está licenciado sob a Licença MIT — veja o arquivo [LICENSE](LICENSE) para detalhes.
 
 ## 👤 Autor
 
-**Anderson Wernek**
+**Anderson Wernek**  
 - GitHub: [@awernek](https://github.com/awernek)
 
 ## 🤝 Contribuindo
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.
+Contribuições são bem-vindas. Abra uma issue ou envie um pull request.
 
-1. Fork o projeto
-2. Crie sua feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+1. Fork o projeto  
+2. Crie sua branch (`git checkout -b feature/MinhaFeature`)  
+3. Commit (`git commit -m 'Add: MinhaFeature'`)  
+4. Push (`git push origin feature/MinhaFeature`)  
+5. Abra um Pull Request  
 
 ---
 
-⭐ Se este projeto foi útil para você, considere dar uma estrela no repositório!
+⭐ Se este projeto foi útil, considere dar uma estrela no repositório.
