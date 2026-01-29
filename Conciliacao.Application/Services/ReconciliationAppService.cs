@@ -59,14 +59,14 @@ namespace Conciliacao.Application.Services
                 {
                     result.Divergent.Add((transaction, external));
                 }
+            }
 
-                // Tudo que sobrou do lado externo é Extra
-                foreach (var externalEntrie in externalEntries)
+            // Tudo que sobrou do lado externo é Extra
+            foreach (var externalEntrie in externalEntries)
+            {
+                if (!usedExternalReferences.Contains(externalEntrie.Reference))
                 {
-                    if (!usedExternalReferences.Contains(externalEntrie.Reference))
-                    {
-                        result.Extra.Add(externalEntrie);
-                    }
+                    result.Extra.Add(externalEntrie);
                 }
             }
 
