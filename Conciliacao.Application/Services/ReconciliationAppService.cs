@@ -1,41 +1,54 @@
-﻿using Conciliacao.Application.Factories;
-using Conciliacao.Application.Models;
+﻿using Conciliacao.Application.DTOs;
+using Conciliacao.Application.Factories;
+using Conciliacao.Application.Mappers;
 using Conciliacao.Domain.Entities;
-using Conciliacao.Domain.Enums;
 
 namespace Conciliacao.Application.Services
 {
     public class ReconciliationAppService
     {
-        private readonly IReconciliationPolicyFactory _factory;
+        private readonly IReconciliationPolicyFactory _policyFactory;
 
-        public ReconciliationAppService(IReconciliationPolicyFactory factory)
+        public ReconciliationAppService(IReconciliationPolicyFactory policyFactory)
         {
-            _factory = factory;
+            _policyFactory = policyFactory;
         }
 
-        public ReconciliationResult Reconcile(
-            Client client,
-            Transaction transaction,
-            ExternalEntry externalEntry)
+        public ReconciliationBatchResultDto ReconcileBatch(
+            ReconciliationBatchRequestDto request)
         {
-            var policy = _factory.CreateFor(client);
+            // Validação mínima de caso de uso
+            if (string.IsNullOrWhiteSpace(request.ClientCode))
+                throw new ApplicationException("ClientCode is required");
 
-            return policy.IsMatch(transaction, externalEntry)
-                ? ReconciliationResult.Matched
-                : ReconciliationResult.Divergent;
-        }
+            if (!request.Transactions.Any())
+                throw new ApplicationException("Transactions cannot be empty");
 
-        public ReconciliationBatchResult ReconcileBatch(
-            Client client,
-            IEnumerable<Transaction> transactions,
-            IEnumerable<ExternalEntry> externalEntries)
-        {
-            var policy = _factory.CreateFor(client);
+            // Cria policy baseada no cliente
+            var client = new Client { Code = request.ClientCode };
+            var policy = _policyFactory.CreateFor(client);
 
-            var service = new InternalBatchReconciliationService(policy);
+            // Mapping DTO → Domain
+            var transactions = request.Transactions
+                .Select(ReconciliationMapper.ToEntity)
+                .ToList();
 
-            return service.Execute(transactions, externalEntries);
+            var externalEntries = request.ExternalEntries
+                .Select(ReconciliationMapper.ToEntity)
+                .ToList();
+
+            // 4️⃣ Executa o caso de uso real
+            var internalService = new InternalBatchReconciliationService(policy);
+            var domainResult = internalService.Execute(transactions, externalEntries);
+
+            // 5️⃣ Mapping Domain → DTO
+            return new ReconciliationBatchResultDto
+            {
+                Matched = domainResult.Matched.Count,
+                Divergent = domainResult.Divergent.Count,
+                Missing = domainResult.Missing.Count,
+                Extra = domainResult.Extra.Count
+            };
         }
     }
 }

@@ -1,5 +1,6 @@
-﻿using Conciliacao.Application.Services;
-using Conciliacao.Domain.Entities;
+﻿using Conciliacao.Application.DTOs;
+using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.Services;
 using Conciliacao.Domain.Tests;
 
 namespace Conciliacao.Application.Tests
@@ -9,36 +10,43 @@ namespace Conciliacao.Application.Tests
         [Fact]
         public void ReconcileBatch_Should_Match_When_Entries_Are_Equal()
         {
+            // Arrange
             var factory = new FakeReconciliationPolicyFactory();
             var service = new ReconciliationAppService(factory);
-            var client = new Client { Code = "CLIENT_TEST" };
 
-            var transactions = new List<Transaction>
+            var request = new ReconciliationBatchRequestDto
             {
-                new Transaction
+                ClientCode = "CLIENT_TEST",
+
+                Transactions = new List<TransactionDto>
                 {
-                    Reference = "ABC123",
-                    Amount = 100m,
-                    Date = new DateTime(2025, 1, 10)
+                    new TransactionDto
+                    {
+                        Reference = "ABC123",
+                        Amount = 100m,
+                        Date = new DateTime(2025, 1, 10)
+                    }
+                },
+
+                ExternalEntries = new List<ExternalEntryDto>
+                {
+                    new ExternalEntryDto
+                    {
+                        Reference = "ABC123",
+                        Amount = 100m,
+                        Date = new DateTime(2025, 1, 10)
+                    }
                 }
             };
 
-            var externalEntries = new List<ExternalEntry>
-            {
-                new ExternalEntry
-                {
-                    Reference = "ABC123",
-                    Amount = 100m,
-                    Date = new DateTime(2025, 1, 10)
-                }
-            };
+            // Act
+            var result = service.ReconcileBatch(request);
 
-            var result = service.ReconcileBatch(client, transactions, externalEntries);
-
-            Assert.Single(result.Matched);
-            Assert.Empty(result.Divergent);
-            Assert.Empty(result.Missing);
-            Assert.Empty(result.Extra);
+            // Assert
+            Assert.Equal(1, result.Matched);
+            Assert.Equal(0, result.Divergent);
+            Assert.Equal(0, result.Missing);
+            Assert.Equal(0, result.Extra);
         }
     }
 }

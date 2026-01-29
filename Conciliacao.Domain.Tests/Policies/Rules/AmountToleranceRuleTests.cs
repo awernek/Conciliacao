@@ -1,32 +1,66 @@
 ﻿using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Policies;
 
-namespace Conciliacao.Domain.Tests.Policies.Rules
+namespace Conciliacao.Domain.Tests.Rules
 {
     public class AmountToleranceRuleTests
     {
         [Fact]
-        public void IsSatisfied_Should_Return_True_When_Difference_Is_Within_Tolerance()
+        public void Should_return_true_when_difference_is_less_than_tolerance()
         {
+            var transaction = new Transaction
+            {
+                Amount = 100.00m
+            };
+
+            var externalEntry = new ExternalEntry
+            {
+                Amount = 99.98m
+            };
+
             var rule = new AmountToleranceRule(0.05m);
 
-            var transaction = new Transaction { Amount = 100.00m };
-            var external = new ExternalEntry { Amount = 99.98m };
-
-            var result = rule.IsSatisfied(transaction, external);
+            var result = rule.IsSatisfied(transaction, externalEntry);
 
             Assert.True(result);
         }
 
         [Fact]
-        public void IsSatisfied_Should_Return_False_When_Difference_Exceeds_Tolerance()
+        public void Should_return_true_when_difference_is_equal_to_tolerance()
         {
-            var rule = new AmountToleranceRule(0.01m);
+            var transaction = new Transaction
+            {
+                Amount = 100.00m
+            };
 
-            var transaction = new Transaction { Amount = 100.00m };
-            var external = new ExternalEntry { Amount = 99.90m };
+            var externalEntry = new ExternalEntry
+            {
+                Amount = 99.95m
+            };
 
-            var result = rule.IsSatisfied(transaction, external);
+            var rule = new AmountToleranceRule(0.05m);
+
+            var result = rule.IsSatisfied(transaction, externalEntry);
+
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void Should_return_false_when_difference_is_greater_than_tolerance()
+        {
+            var transaction = new Transaction
+            {
+                Amount = 100.00m
+            };
+
+            var externalEntry = new ExternalEntry
+            {
+                Amount = 99.90m
+            };
+
+            var rule = new AmountToleranceRule(0.05m);
+
+            var result = rule.IsSatisfied(transaction, externalEntry);
 
             Assert.False(result);
         }

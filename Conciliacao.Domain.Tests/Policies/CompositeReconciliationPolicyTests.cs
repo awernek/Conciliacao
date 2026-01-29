@@ -45,5 +45,4 @@ namespace Conciliacao.Domain.Tests.Policies
             Assert.False(result);
         }
     }
-
 }
