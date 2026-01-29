@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Conciliacao.Application\Conciliacao.Application.csproj" />
     <ProjectReference Include="..\Conciliacao.Domain\Conciliacao.Domain.csproj" />
   </ItemGroup>
 
