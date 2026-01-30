@@ -2,65 +2,64 @@ using Conciliacao.Application.DTOs;
 using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Mappers;
+using Conciliacao.Application.Models;
 using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Enums;
+using Conciliacao.Domain.Repositories;
+using Conciliacao.Infrastructure.Persistence.Repositories;
 
 namespace Conciliacao.Application.Services
 {
     public class ReconciliationAppService
     {
-        private readonly IReconciliationPolicyFactory _policyFactory;
+        private readonly IReconciliationPolicyFactory _factory;
+        private readonly ITransactionRepository _transactionRepository;
+        private readonly IExternalEntryRepository _externalEntryRepository;
 
-        public ReconciliationAppService(IReconciliationPolicyFactory policyFactory)
+        public ReconciliationAppService(
+            IReconciliationPolicyFactory factory,
+            ITransactionRepository transactionRepository,
+            IExternalEntryRepository externalEntryRepository)
         {
-            _policyFactory = policyFactory;
+            _factory = factory;
+            _transactionRepository = transactionRepository;
+            _externalEntryRepository = externalEntryRepository;
         }
 
-        public ReconciliationBatchResponseDto ReconcileBatch(
-            ReconciliationBatchRequestDto request)
+        public async Task<ReconciliationBatchResponseDto> ReconcileBatchAsync(
+            Client client,
+            IEnumerable<TransactionDto> transactionDtos,
+            IEnumerable<ExternalEntryDto> externalEntryDtos)
         {
-            // Validação mínima de caso de uso
-            if (string.IsNullOrWhiteSpace(request.ClientCode))
-                throw new ApplicationException("ClientCode is required");
+            // Map DTO -> Entidade usando o Mapper
+            var transactions = transactionDtos.Select(ReconciliationMapper.ToEntity).ToList();
+            var externalEntries = externalEntryDtos.Select(ReconciliationMapper.ToEntity).ToList();
 
-            if (!request.Transactions.Any())
-                throw new ApplicationException("Transactions cannot be empty");
+            // Persistência
+            foreach (var t in transactions)
+                await _transactionRepository.AddAsync(t);
 
-            // Cria policy baseada no cliente
-            var client = new Client { Code = request.ClientCode };
-            var policy = _policyFactory.CreateFor(client);
+            foreach (var e in externalEntries)
+                await _externalEntryRepository.AddAsync(e);
 
-            // Mapping DTO → Domain
-            var transactions = request.Transactions
-                .Select(ReconciliationMapper.ToEntity)
-                .ToList();
+            // Cria a policy do cliente
+            var policy = _factory.CreateFor(client);
 
-            var externalEntries = request.ExternalEntries
-                .Select(ReconciliationMapper.ToEntity)
-                .ToList();
+            // Conciliação
+            var service = new InternalBatchReconciliationService(policy);
+            var result = service.Execute(transactions, externalEntries);
 
-            // 4️⃣ Executa o caso de uso real
-            var internalService = new InternalBatchReconciliationService(policy);
-            var domainResult = internalService.Execute(transactions, externalEntries);
-
-            // 5️⃣ Mapping Domain → DTO
+            // Mapear resultado -> DTO usando o Mapper
             return new ReconciliationBatchResponseDto
             {
-                Matched = domainResult.Matched
-                    .Select(p => new MatchedPairDto
-                    {
-                        Transaction = ReconciliationMapper.ToDto(p.Transaction),
-                        ExternalEntry = ReconciliationMapper.ToDto(p.ExternalEntry)
-                    })
+                Missing = result.Missing.Select(ReconciliationMapper.ToDto).ToList(),
+                Extra = result.Extra.Select(ReconciliationMapper.ToDto).ToList(),
+                Matched = result.Matched
+                    .Select(m => (ReconciliationMapper.ToDto(m.Transaction), ReconciliationMapper.ToDto(m.ExternalEntry)))
                     .ToList(),
-                Divergent = domainResult.Divergent
-                    .Select(p => new DivergenceDto
-                    {
-                        Transaction = ReconciliationMapper.ToDto(p.Transaction),
-                        ExternalEntry = ReconciliationMapper.ToDto(p.ExternalEntry)
-                    })
-                    .ToList(),
-                Missing = domainResult.Missing.Select(ReconciliationMapper.ToDto).ToList(),
-                Extra = domainResult.Extra.Select(ReconciliationMapper.ToDto).ToList()
+                Divergent = result.Divergent
+                    .Select(d => (ReconciliationMapper.ToDto(d.Transaction), ReconciliationMapper.ToDto(d.ExternalEntry)))
+                    .ToList()
             };
         }
     }

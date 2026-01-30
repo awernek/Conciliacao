@@ -1,33 +1,26 @@
-using Conciliacao.Application.DTOs;
 using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Services;
+using Conciliacao.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Conciliacao.Api.Controllers
+[ApiController]
+[Route("api/[controller]")]
+public class ReconciliationController : ControllerBase
 {
-    [ApiController]
-    [Route("api/reconciliation")]
-    public class ReconciliationController : ControllerBase
+    private readonly ReconciliationAppService _appService;
+
+    public ReconciliationController(ReconciliationAppService appService)
     {
-        private readonly ReconciliationAppService _service;
+        _appService = appService;
+    }
 
-        public ReconciliationController(ReconciliationAppService service)
-        {
-            _service = service;
-        }
-
-        [HttpPost("batch")]
-        [ProducesResponseType(typeof(ReconciliationBatchResponseDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult ReconcileBatch(
-            [FromBody] ReconciliationBatchRequestDto request)
-        {
-            if (request == null)
-                return BadRequest("Request inválido");
-
-            var result = _service.ReconcileBatch(request);
-
-            return Ok(result);
-        }
+    [HttpPost("batch")]
+    public async Task<ActionResult<ReconciliationBatchResponseDto>> ReconcileBatch(
+        [FromQuery] string clientCode,
+        [FromBody] BatchReconciliationRequestDto request)
+    {
+        var client = new Client { Code = clientCode };
+        var result = await _appService.ReconcileBatchAsync(client, request.Transactions, request.ExternalEntries);
+        return Ok(result);
     }
 }

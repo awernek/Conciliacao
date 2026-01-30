@@ -1,5 +1,4 @@
-﻿using Conciliacao.Api.Tests.Fixtures;
-using Conciliacao.Application.DTOs;
+using Conciliacao.Api.Tests.Fixtures;
 using Conciliacao.Application.DTOs.Reconciliation;
 using FluentAssertions;
 using System.Net;
@@ -20,10 +19,9 @@ namespace Conciliacao.Api.Tests.Reconciliation
         [Fact]
         public async Task POST_batch_should_return_matched_result()
         {
-            // Arrange
-            var request = new ReconciliationBatchRequestDto
+            // Arrange: o controller espera clientCode na query e o body como BatchReconciliationRequestDto (sem ClientCode)
+            var request = new BatchReconciliationRequestDto
             {
-                ClientCode = "CLIENT_A",
                 Transactions =
                 {
                     new TransactionDto
@@ -44,9 +42,9 @@ namespace Conciliacao.Api.Tests.Reconciliation
                 }
             };
 
-            // Act
+            // Act: clientCode na query; body com Transactions e ExternalEntries
             var response = await _client.PostAsJsonAsync(
-                "/api/reconciliation/batch",
+                "/api/reconciliation/batch?clientCode=CLIENT_A",
                 request);
 
             // Assert

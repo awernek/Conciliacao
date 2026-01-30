@@ -1,7 +1,7 @@
 using Conciliacao.Application.DTOs;
 using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Services;
-using Conciliacao.Domain.Tests;
+using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Domain.Tests
 {
@@ -11,39 +11,36 @@ namespace Conciliacao.Domain.Tests
     public class ReconciliationAppServiceTests
     {
         [Fact]
-        public void ReconcileBatch_Should_Match_When_Entries_Are_Equal()
+        public async Task ReconcileBatchAsync_Should_Match_When_Entries_Are_Equal()
         {
             // Preparar
             var factory = new FakeReconciliationPolicyFactory();
-            var service = new ReconciliationAppService(factory);
+            var transactionRepository = new FakeTransactionRepository();
+            var externalEntryRepository = new FakeExternalEntryRepository();
+            var service = new ReconciliationAppService(factory, transactionRepository, externalEntryRepository);
 
-            var request = new ReconciliationBatchRequestDto
+            var client = new Client { Code = "CLIENT_TEST" };
+            var transactions = new List<TransactionDto>
             {
-                ClientCode = "CLIENT_TEST",
-
-                Transactions = new List<TransactionDto>
+                new TransactionDto
                 {
-                    new TransactionDto
-                    {
-                        Reference = "ABC123",
-                        Amount = 100m,
-                        Date = new DateTime(2025, 1, 10)
-                    }
-                },
-
-                ExternalEntries = new List<ExternalEntryDto>
+                    Reference = "ABC123",
+                    Amount = 100m,
+                    Date = new DateTime(2025, 1, 10)
+                }
+            };
+            var externalEntries = new List<ExternalEntryDto>
+            {
+                new ExternalEntryDto
                 {
-                    new ExternalEntryDto
-                    {
-                        Reference = "ABC123",
-                        Amount = 100m,
-                        Date = new DateTime(2025, 1, 10)
-                    }
+                    Reference = "ABC123",
+                    Amount = 100m,
+                    Date = new DateTime(2025, 1, 10)
                 }
             };
 
             // Agir
-            var result = service.ReconcileBatch(request);
+            var result = await service.ReconcileBatchAsync(client, transactions, externalEntries);
 
             // Verificar
             Assert.Single(result.Matched);
