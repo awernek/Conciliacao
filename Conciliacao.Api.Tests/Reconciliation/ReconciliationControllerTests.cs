@@ -6,8 +6,7 @@ using System.Net.Http.Json;
 
 namespace Conciliacao.Api.Tests.Reconciliation
 {
-    public class ReconciliationControllerTests
-        : IClassFixture<CustomWebApplicationFactory>
+    public class ReconciliationControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         private readonly HttpClient _client;
 
@@ -16,57 +15,170 @@ namespace Conciliacao.Api.Tests.Reconciliation
             _client = factory.CreateClient();
         }
 
+        #region Helpers
+
+        private TransactionDto CreateTransactionDto(string reference, decimal amount, DateTime date)
+            => new() { Reference = reference, Amount = amount, Date = date };
+
+        private ExternalEntryDto CreateExternalEntryDto(string reference, decimal amount, DateTime date, string source = "SYSTEM")
+            => new() { Reference = reference, Amount = amount, Date = date, Source = source };
+
+        private BatchReconciliationRequestDto CreateBatchRequest(
+            IEnumerable<TransactionDto> transactions,
+            IEnumerable<ExternalEntryDto> externalEntries)
+            => new()
+            {
+                Transactions = transactions.ToList(),
+                ExternalEntries = externalEntries.ToList()
+            };
+
+        #endregion
+
         [Fact]
         public async Task POST_batch_should_return_matched_result()
         {
-            // Arrange: o controller espera clientCode na query e o body como BatchReconciliationRequestDto (sem ClientCode)
-            var request = new BatchReconciliationRequestDto
+            // Arrange
+            var clientCode = "CLIENT_A";
+
+            var transactions = new[]
             {
-                Transactions =
-                {
-                    new TransactionDto
-                    {
-                        Reference = "TX1",
-                        Amount = 100m,
-                        Date = new DateTime(2025, 1, 10)
-                    }
-                },
-                ExternalEntries =
-                {
-                    new ExternalEntryDto
-                    {
-                        Reference = "TX1",
-                        Amount = 100m,
-                        Date = new DateTime(2025, 1, 10)
-                    }
-                }
+                CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
             };
 
-            // Act: clientCode na query; body com Transactions e ExternalEntries
-            var response = await _client.PostAsJsonAsync(
-                "/api/reconciliation/batch?clientCode=CLIENT_A",
-                request);
+            var externalEntries = new[]
+            {
+                CreateExternalEntryDto("TX1", 100m, new DateTime(2025, 1, 10))
+            };
+
+            var request = CreateBatchRequest(transactions, externalEntries);
+
+            // Act
+            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+
+            // Assert: status code
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // Assert: conteúdo
+            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            result.Should().NotBeNull();
+
+            // Matched
+            result!.Matched.Should().ContainSingle(pair =>
+                pair.Transaction!.Reference == "TX1" &&
+                pair.Transaction.Amount == 100m &&
+                pair.ExternalEntry!.Reference == "TX1" &&
+                pair.ExternalEntry.Amount == 100m
+            );
+
+            // Outros arrays
+            result.Divergent.Should().BeEmpty();
+            result.Missing.Should().BeEmpty();
+            result.Extra.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task POST_batch_should_return_divergent_result()
+        {
+            // Arrange
+            var clientCode = "CLIENT_A";
+
+            var transactions = new[]
+            {
+        CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
+    };
+
+            var externalEntries = new[]
+            {
+        CreateExternalEntryDto("TX1", 90m, new DateTime(2025, 1, 10)) // Difere do Amount
+    };
+
+            var request = CreateBatchRequest(transactions, externalEntries);
+
+            // Act
+            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
 
             // Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var result = await response.Content
-                .ReadFromJsonAsync<ReconciliationBatchResponseDto>();
-
+            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
             result.Should().NotBeNull();
-            result!.Matched.Should().HaveCount(1);
-            result.Divergent.Should().BeEmpty();
+
+            result!.Divergent.Should().ContainSingle(pair =>
+                pair.Transaction!.Reference == "TX1" &&
+                pair.Transaction.Amount == 100m &&
+                pair.ExternalEntry!.Reference == "TX1" &&
+                pair.ExternalEntry.Amount == 90m
+            );
+
+            result.Matched.Should().BeEmpty();
             result.Missing.Should().BeEmpty();
             result.Extra.Should().BeEmpty();
-
-            // Asserts sobre valores específicos do DTO retornado (MatchedPairDto com Transaction e ExternalEntry).
-            var pair = result.Matched[0];
-            pair.Transaction.Should().NotBeNull();
-            pair.ExternalEntry.Should().NotBeNull();
-            pair.Transaction!.Reference.Should().Be("TX1");
-            pair.Transaction.Amount.Should().Be(100m);
-            pair.ExternalEntry!.Reference.Should().Be("TX1");
-            pair.ExternalEntry.Amount.Should().Be(100m);
         }
+
+        [Fact]
+        public async Task POST_batch_should_return_missing_result()
+        {
+            // Arrange
+            var clientCode = "CLIENT_A";
+
+            var transactions = new[]
+            {
+        CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
+    };
+
+            var externalEntries = Array.Empty<ExternalEntryDto>(); // Nenhum externo
+
+            var request = CreateBatchRequest(transactions, externalEntries);
+
+            // Act
+            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+
+            // Assert
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            result.Should().NotBeNull();
+
+            result!.Missing.Should().ContainSingle(t =>
+                t.Reference == "TX1" && t.Amount == 100m
+            );
+
+            result.Matched.Should().BeEmpty();
+            result.Divergent.Should().BeEmpty();
+            result.Extra.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task POST_batch_should_return_extra_result()
+        {
+            // Arrange
+            var clientCode = "CLIENT_A";
+
+            var transactions = Array.Empty<TransactionDto>(); // Nenhuma transação
+            var externalEntries = new[]
+            {
+        CreateExternalEntryDto("TX1", 100m, new DateTime(2025, 1, 10))
+    };
+
+            var request = CreateBatchRequest(transactions, externalEntries);
+
+            // Act
+            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+
+            // Assert
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            result.Should().NotBeNull();
+
+            result!.Extra.Should().ContainSingle(e =>
+                e.Reference == "TX1" && e.Amount == 100m
+            );
+
+            result.Matched.Should().BeEmpty();
+            result.Divergent.Should().BeEmpty();
+            result.Missing.Should().BeEmpty();
+        }
+
     }
 }
