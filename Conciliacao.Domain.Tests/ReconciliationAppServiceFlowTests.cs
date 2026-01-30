@@ -3,14 +3,17 @@ using Conciliacao.Application.DTOs.Reconciliation;
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Services;
 
-namespace Conciliacao.Application.Tests
+namespace Conciliacao.Domain.Tests
 {
+    /// <summary>
+    /// Testes de fluxo do serviço de aplicação de conciliação com factory real.
+    /// </summary>
     public class ReconciliationAppServiceFlowTests
     {
         [Fact]
         public void Should_Reconcile_Batch_Correctly_For_Client_A()
         {
-            // Arrange
+            // Preparar
             var factory = new ReconciliationPolicyFactory();
             var appService = new ReconciliationAppService(factory);
 
@@ -51,10 +54,10 @@ namespace Conciliacao.Application.Tests
                 }
             };
 
-            // Act
+            // Agir
             var result = appService.ReconcileBatch(request);
 
-            // Assert
+            // Verificar
             Assert.Single(result.Matched);
             Assert.Single(result.Missing);
             Assert.Empty(result.Divergent);

@@ -1,33 +1,40 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Domain.Tests.Policies.Rules
 {
+    /// <summary>
+    /// Testes da regra de correspondência de referência (ReferenceMatchRule).
+    /// </summary>
     public class ReferenceMatchRuleTests
     {
         [Fact]
         public void IsSatisfied_Should_Return_True_When_References_Are_Equal()
         {
+            // Preparar
             var rule = new ReferenceMatchRule();
-
             var transaction = new Transaction { Reference = "ABC123" };
             var external = new ExternalEntry { Reference = "ABC123" };
 
+            // Agir
             var result = rule.IsSatisfied(transaction, external);
 
+            // Verificar
             Assert.True(result);
         }
 
         [Fact]
         public void IsSatisfied_Should_Return_False_When_References_Are_Different()
         {
+            // Preparar
             var rule = new ReferenceMatchRule();
-
             var transaction = new Transaction { Reference = "ABC123" };
             var external = new ExternalEntry { Reference = "XYZ999" };
 
+            // Agir
             var result = rule.IsSatisfied(transaction, external);
 
+            // Verificar
             Assert.False(result);
         }
     }

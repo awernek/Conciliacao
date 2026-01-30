@@ -1,67 +1,55 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Policies;
 
-namespace Conciliacao.Domain.Tests.Rules
+namespace Conciliacao.Domain.Tests.Policies.Rules
 {
+    /// <summary>
+    /// Testes da regra de tolerância de valor (AmountToleranceRule).
+    /// </summary>
     public class AmountToleranceRuleTests
     {
         [Fact]
-        public void Should_return_true_when_difference_is_less_than_tolerance()
+        public void IsSatisfied_Should_Return_True_When_Difference_Is_Less_Than_Tolerance()
         {
-            var transaction = new Transaction
-            {
-                Amount = 100.00m
-            };
-
-            var externalEntry = new ExternalEntry
-            {
-                Amount = 99.98m
-            };
-
+            // Preparar
+            var transaction = new Transaction { Amount = 100.00m };
+            var externalEntry = new ExternalEntry { Amount = 99.98m };
             var rule = new AmountToleranceRule(0.05m);
 
+            // Agir
             var result = rule.IsSatisfied(transaction, externalEntry);
 
+            // Verificar
             Assert.True(result);
         }
 
         [Fact]
-        public void Should_return_true_when_difference_is_equal_to_tolerance()
+        public void IsSatisfied_Should_Return_True_When_Difference_Is_Equal_To_Tolerance()
         {
-            var transaction = new Transaction
-            {
-                Amount = 100.00m
-            };
-
-            var externalEntry = new ExternalEntry
-            {
-                Amount = 99.95m
-            };
-
+            // Preparar
+            var transaction = new Transaction { Amount = 100.00m };
+            var externalEntry = new ExternalEntry { Amount = 99.95m };
             var rule = new AmountToleranceRule(0.05m);
 
+            // Agir
             var result = rule.IsSatisfied(transaction, externalEntry);
 
+            // Verificar
             Assert.True(result);
         }
 
         [Fact]
-        public void Should_return_false_when_difference_is_greater_than_tolerance()
+        public void IsSatisfied_Should_Return_False_When_Difference_Is_Greater_Than_Tolerance()
         {
-            var transaction = new Transaction
-            {
-                Amount = 100.00m
-            };
-
-            var externalEntry = new ExternalEntry
-            {
-                Amount = 99.90m
-            };
-
+            // Preparar
+            var transaction = new Transaction { Amount = 100.00m };
+            var externalEntry = new ExternalEntry { Amount = 99.90m };
             var rule = new AmountToleranceRule(0.05m);
 
+            // Agir
             var result = rule.IsSatisfied(transaction, externalEntry);
 
+            // Verificar
             Assert.False(result);
         }
     }

@@ -1,18 +1,21 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Enums;
 using Conciliacao.Domain.Policies;
 using Conciliacao.Domain.Services;
 
 namespace Conciliacao.Domain.Tests
 {
-    public class SimpleReconciliationBatchTests
+    /// <summary>
+    /// Testes do serviço de conciliação simples (SimpleReconciliationService).
+    /// </summary>
+    public class SimpleReconciliationServiceTests
     {
         [Fact]
         public void Reconcile_Should_Classify_Matched_Missing_And_Extra()
         {
+            // Preparar
             var policy = new DefaultReconciliationPolicy(0.05m);
             var service = new SimpleReconciliationService(policy);
-
             var transactions = new[]
             {
                 new Transaction
@@ -39,8 +42,10 @@ namespace Conciliacao.Domain.Tests
                 }
             };
 
+            // Agir
             var result = service.Reconcile(transactions, externalEntries);
 
+            // Verificar
             Assert.Contains(result, r => r.Result == ReconciliationResult.Matched);
             Assert.Contains(result, r => r.Result == ReconciliationResult.Extra);
         }
