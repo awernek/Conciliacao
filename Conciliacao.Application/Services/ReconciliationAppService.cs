@@ -49,16 +49,24 @@ namespace Conciliacao.Application.Services
             var service = new InternalBatchReconciliationService(policy);
             var result = service.Execute(transactions, externalEntries);
 
-            // Mapear resultado -> DTO usando o Mapper
+            // Mapear resultado -> DTO usando o Mapper (MatchedPairDto para JSON com Transaction/ExternalEntry)
             return new ReconciliationBatchResponseDto
             {
                 Missing = result.Missing.Select(ReconciliationMapper.ToDto).ToList(),
                 Extra = result.Extra.Select(ReconciliationMapper.ToDto).ToList(),
                 Matched = result.Matched
-                    .Select(m => (ReconciliationMapper.ToDto(m.Transaction), ReconciliationMapper.ToDto(m.ExternalEntry)))
+                    .Select(m => new MatchedPairDto
+                    {
+                        Transaction = ReconciliationMapper.ToDto(m.Transaction),
+                        ExternalEntry = ReconciliationMapper.ToDto(m.ExternalEntry)
+                    })
                     .ToList(),
                 Divergent = result.Divergent
-                    .Select(d => (ReconciliationMapper.ToDto(d.Transaction), ReconciliationMapper.ToDto(d.ExternalEntry)))
+                    .Select(d => new MatchedPairDto
+                    {
+                        Transaction = ReconciliationMapper.ToDto(d.Transaction),
+                        ExternalEntry = ReconciliationMapper.ToDto(d.ExternalEntry)
+                    })
                     .ToList()
             };
         }

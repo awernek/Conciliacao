@@ -58,6 +58,15 @@ namespace Conciliacao.Api.Tests.Reconciliation
             result.Divergent.Should().BeEmpty();
             result.Missing.Should().BeEmpty();
             result.Extra.Should().BeEmpty();
+
+            // Asserts sobre valores específicos do DTO retornado (MatchedPairDto com Transaction e ExternalEntry).
+            var pair = result.Matched[0];
+            pair.Transaction.Should().NotBeNull();
+            pair.ExternalEntry.Should().NotBeNull();
+            pair.Transaction!.Reference.Should().Be("TX1");
+            pair.Transaction.Amount.Should().Be(100m);
+            pair.ExternalEntry!.Reference.Should().Be("TX1");
+            pair.ExternalEntry.Amount.Should().Be(100m);
         }
     }
 }
