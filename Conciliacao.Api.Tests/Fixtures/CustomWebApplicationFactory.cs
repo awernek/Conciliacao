@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Conciliacao.Api.Tests.Fixtures
 {
@@ -21,22 +22,23 @@ namespace Conciliacao.Api.Tests.Fixtures
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseEnvironment("Development");
+            // "Testing" evita que o Program registre SqlServer; aqui registramos InMemory + repositórios
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("DetailedErrors", "true");
 
-            // Application já está registrada no Program. Aqui registramos apenas a persistência:
-            // DbContext com EF Core InMemory e repositórios reais, para testar integração com o fluxo real.
+            // Evita falha "Cannot open log for source '.NET Runtime'. You may not have write access."
+            // (Event Log do Windows exige permissões que o processo de teste não tem)
+            builder.ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddDebug();
+            });
+
+            // Em ambiente "Testing" o Program não registra DbContext; registramos aqui InMemory + repositórios
             builder.ConfigureServices(services =>
             {
-                // Remove registros de DbContext existentes (se o Program registrar no futuro) para evitar conflito
-                var descriptor = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(DbContextOptions<ConciliationDbContext>));
-                if (descriptor != null)
-                    services.Remove(descriptor);
-
                 services.AddDbContext<ConciliationDbContext>(options =>
-                {
-                    options.UseInMemoryDatabase(InMemoryDatabaseName);
-                });
+                    options.UseInMemoryDatabase(InMemoryDatabaseName));
 
                 services.AddScoped<ITransactionRepository, TransactionRepository>();
                 services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();

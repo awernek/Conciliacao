@@ -1,5 +1,10 @@
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Services;
+using Conciliacao.Domain.Repositories;
+using Conciliacao.Infra.Repositories;
+using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infrastructure.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +12,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Banco de dados: em ambiente "Testing" a factory de testes registra InMemory + repositórios
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' não configurada.");
+
+    builder.Services.AddDbContext<ConciliationDbContext>(options =>
+        options.UseSqlServer(connectionString));
+
+    builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+    builder.Services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
+}
 
 // Application
 builder.Services.AddScoped<IReconciliationPolicyFactory, ReconciliationPolicyFactory>();
