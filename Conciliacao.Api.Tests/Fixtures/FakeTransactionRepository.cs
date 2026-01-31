@@ -26,5 +26,11 @@ namespace Conciliacao.Api.Tests.Fixtures
         {
             return Task.FromResult(new List<Transaction>(_items));
         }
+
+        public Task AddRangeAsync(IEnumerable<Transaction> transactions)
+        {
+            _items.AddRange(transactions);
+            return Task.CompletedTask;
+        }
     }
 }

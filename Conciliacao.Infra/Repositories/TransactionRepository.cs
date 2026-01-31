@@ -17,7 +17,11 @@ namespace Conciliacao.Infrastructure.Persistence.Repositories
         public async Task AddAsync(Transaction transaction)
         {
             _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
+        }
+
+        public async Task AddRangeAsync(IEnumerable<Transaction> transactions)
+        {
+            await _context.Transactions.AddRangeAsync(transactions);
         }
 
         public async Task<Transaction?> GetByReferenceAsync(string reference)

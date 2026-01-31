@@ -15,15 +15,18 @@ namespace Conciliacao.Application.Services
         private readonly IReconciliationPolicyFactory _factory;
         private readonly ITransactionRepository _transactionRepository;
         private readonly IExternalEntryRepository _externalEntryRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
         public ReconciliationAppService(
             IReconciliationPolicyFactory factory,
             ITransactionRepository transactionRepository,
-            IExternalEntryRepository externalEntryRepository)
+            IExternalEntryRepository externalEntryRepository,
+            IUnitOfWork unitOfWork)
         {
             _factory = factory;
             _transactionRepository = transactionRepository;
             _externalEntryRepository = externalEntryRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<ReconciliationBatchResponseDto> ReconcileBatchAsync(
@@ -35,12 +38,9 @@ namespace Conciliacao.Application.Services
             var transactions = transactionDtos.Select(ReconciliationMapper.ToEntity).ToList();
             var externalEntries = externalEntryDtos.Select(ReconciliationMapper.ToEntity).ToList();
 
-            // Persistência
-            foreach (var t in transactions)
-                await _transactionRepository.AddAsync(t);
-
-            foreach (var e in externalEntries)
-                await _externalEntryRepository.AddAsync(e);
+            // Persistência (sem commit ainda — commit só ao final para permitir rollback em caso de erro)
+            await _transactionRepository.AddRangeAsync(transactions);
+            await _externalEntryRepository.AddRangeAsync(externalEntries);
 
             // Cria a policy do cliente
             var policy = _factory.CreateFor(client);
@@ -50,7 +50,7 @@ namespace Conciliacao.Application.Services
             var result = service.Execute(transactions, externalEntries);
 
             // Mapear resultado -> DTO usando o Mapper (MatchedPairDto para JSON com Transaction/ExternalEntry)
-            return new ReconciliationBatchResponseDto
+            var response = new ReconciliationBatchResponseDto
             {
                 Missing = result.Missing.Select(ReconciliationMapper.ToDto).ToList(),
                 Extra = result.Extra.Select(ReconciliationMapper.ToDto).ToList(),
@@ -69,6 +69,9 @@ namespace Conciliacao.Application.Services
                     })
                     .ToList()
             };
+
+            await _unitOfWork.CommitAsync();
+            return response;
         }
     }
 }

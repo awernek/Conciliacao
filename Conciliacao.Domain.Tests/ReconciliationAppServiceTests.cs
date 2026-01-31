@@ -17,7 +17,8 @@ namespace Conciliacao.Domain.Tests
             var factory = new FakeReconciliationPolicyFactory();
             var transactionRepository = new FakeTransactionRepository();
             var externalEntryRepository = new FakeExternalEntryRepository();
-            var service = new ReconciliationAppService(factory, transactionRepository, externalEntryRepository);
+            var unitOfWork = new FakeUnitOfWork();
+            var service = new ReconciliationAppService(factory, transactionRepository, externalEntryRepository, unitOfWork);
 
             var client = new Client { Code = "CLIENT_TEST" };
             var transactions = new List<TransactionDto>

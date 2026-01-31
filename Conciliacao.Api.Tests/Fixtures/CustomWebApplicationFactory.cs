@@ -1,3 +1,4 @@
+using Conciliacao.Api.Tests.Infrastructure;
 using Conciliacao.Domain.Repositories;
 using Conciliacao.Infra.Repositories;
 using Conciliacao.Infrastructure.Persistence.Contexts;
@@ -22,26 +23,33 @@ namespace Conciliacao.Api.Tests.Fixtures
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            // "Testing" evita que o Program registre SqlServer; aqui registramos InMemory + repositórios
             builder.UseEnvironment("Testing");
-            builder.UseSetting("DetailedErrors", "true");
 
-            // Evita falha "Cannot open log for source '.NET Runtime'. You may not have write access."
-            // (Event Log do Windows exige permissões que o processo de teste não tem)
-            builder.ConfigureLogging(logging =>
-            {
-                logging.ClearProviders();
-                logging.AddDebug();
-            });
-
-            // Em ambiente "Testing" o Program não registra DbContext; registramos aqui InMemory + repositórios
             builder.ConfigureServices(services =>
             {
-                services.AddDbContext<ConciliationDbContext>(options =>
-                    options.UseInMemoryDatabase(InMemoryDatabaseName));
+                var descriptor = services.SingleOrDefault(
+                    d => d.ServiceType == typeof(DbContextOptions<ConciliationDbContext>));
 
-                services.AddScoped<ITransactionRepository, TransactionRepository>();
+                if (descriptor != null)
+                    services.Remove(descriptor);
+
+                services.AddSingleton<SaveChangesCallCounter>();
+
+                services.AddDbContext<ConciliationDbContext>(options =>
+                {
+                    options.UseInMemoryDatabase("ConciliationTestDb");
+                });
+
+                services.AddScoped<TestConciliationDbContext>();
+                services.AddScoped<ConciliationDbContext>(
+                    sp => sp.GetRequiredService<TestConciliationDbContext>());
+
+                // Em ambiente Testing o Program não registra repositórios nem IUnitOfWork; registramos aqui.
+                services.AddScoped<TransactionRepository>();
+                services.AddScoped<ITransactionRepository>(sp =>
+                    new ThrowingOnTxFailTransactionRepositoryDecorator(sp.GetRequiredService<TransactionRepository>()));
                 services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
+                services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
             });
         }
     }

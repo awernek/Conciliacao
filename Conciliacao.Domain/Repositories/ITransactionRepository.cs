@@ -6,6 +6,7 @@ namespace Conciliacao.Domain.Repositories
     {
         Task AddAsync(Transaction transaction);
         Task<Transaction?> GetByReferenceAsync(string reference);
+        Task AddRangeAsync(IEnumerable<Transaction> transactions);
         Task<List<Transaction>> GetAllAsync();
     }
 }

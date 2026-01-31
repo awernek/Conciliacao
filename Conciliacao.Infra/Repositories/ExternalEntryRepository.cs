@@ -17,13 +17,11 @@ namespace Conciliacao.Infra.Repositories
         public async Task AddAsync(ExternalEntry externalEntry)
         {
             _context.ExternalEntries.Add(externalEntry);
-            await _context.SaveChangesAsync();
         }
 
         public async Task AddRangeAsync(IEnumerable<ExternalEntry> entries)
         {
             await _context.ExternalEntries.AddRangeAsync(entries);
-            await _context.SaveChangesAsync();
         }
 
         public async Task<List<ExternalEntry>> GetAllAsync()

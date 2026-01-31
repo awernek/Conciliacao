@@ -19,8 +19,15 @@ public class ReconciliationController : ControllerBase
         [FromQuery] string clientCode,
         [FromBody] BatchReconciliationRequestDto request)
     {
-        var client = new Client { Code = clientCode };
-        var result = await _appService.ReconcileBatchAsync(client, request.Transactions, request.ExternalEntries);
-        return Ok(result);
+        try
+        {
+            var client = new Client { Code = clientCode };
+            var result = await _appService.ReconcileBatchAsync(client, request.Transactions, request.ExternalEntries);
+            return Ok(result);
+        }
+        catch
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
     }
 }

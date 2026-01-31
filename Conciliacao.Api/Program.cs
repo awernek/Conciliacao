@@ -24,6 +24,7 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
     builder.Services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
+    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
 }
 
 // Application
