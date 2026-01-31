@@ -8,6 +8,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
     /// </summary>
     public class AmountToleranceRuleTests
     {
+        /// <summary>
+        /// Garante que a regra retorna true quando a diferença entre os valores é menor que a tolerância.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_True_When_Difference_Is_Less_Than_Tolerance()
         {
@@ -23,6 +26,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
             Assert.True(result);
         }
 
+        /// <summary>
+        /// Garante que a regra retorna true quando a diferença entre os valores é exatamente igual à tolerância.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_True_When_Difference_Is_Equal_To_Tolerance()
         {
@@ -38,6 +44,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
             Assert.True(result);
         }
 
+        /// <summary>
+        /// Garante que a regra retorna false quando a diferença entre os valores é maior que a tolerância.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_False_When_Difference_Is_Greater_Than_Tolerance()
         {

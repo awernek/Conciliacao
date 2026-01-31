@@ -8,6 +8,10 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
     /// </summary>
     public class DateMatchRuleTests
     {
+        /// <summary>
+        /// Garante que a regra retorna true quando transação e entrada externa têm a mesma data (mesmo dia),
+        /// mesmo com horários diferentes.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_True_When_Dates_Are_Same_Day()
         {
@@ -23,6 +27,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
             Assert.True(result);
         }
 
+        /// <summary>
+        /// Garante que a regra retorna false quando transação e entrada externa têm datas em dias diferentes.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_False_When_Dates_Are_Different()
         {

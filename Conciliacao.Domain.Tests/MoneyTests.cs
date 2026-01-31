@@ -2,6 +2,9 @@ using Conciliacao.Domain.ValueObjects;
 
 namespace Conciliacao.Domain.Tests
 {
+    /// <summary>
+    /// Testes do value object Money e da comparação com tolerância.
+    /// </summary>
     public class MoneyTests
     {
         /// <summary>

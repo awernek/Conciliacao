@@ -11,6 +11,11 @@ namespace Conciliacao.Domain.Tests
     /// </summary>
     public class ReconciliationAppServiceFlowTests
     {
+        /// <summary>
+        /// Garante que, para o cliente CLIENT_A, um lote com transações e entradas externas
+        /// é classificado corretamente: um matched (TX1), um missing (TX2), um extra (TX3),
+        /// usando a política real com tolerância de valor.
+        /// </summary>
         [Fact]
         public async Task Should_Reconcile_Batch_Correctly_For_Client_A()
         {

@@ -8,6 +8,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
     /// </summary>
     public class ReferenceMatchRuleTests
     {
+        /// <summary>
+        /// Garante que a regra retorna true quando a referência da transação e da entrada externa são iguais.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_True_When_References_Are_Equal()
         {
@@ -23,6 +26,9 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
             Assert.True(result);
         }
 
+        /// <summary>
+        /// Garante que a regra retorna false quando a referência da transação e da entrada externa são diferentes.
+        /// </summary>
         [Fact]
         public void IsSatisfied_Should_Return_False_When_References_Are_Different()
         {

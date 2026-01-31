@@ -8,6 +8,9 @@ namespace Conciliacao.Domain.Tests.Policies
     /// </summary>
     public class CompositeReconciliationPolicyTests
     {
+        /// <summary>
+        /// Garante que IsMatch retorna true quando todas as regras da política composta são satisfeitas.
+        /// </summary>
         [Fact]
         public void IsMatch_Should_Return_True_When_All_Rules_Are_Satisfied()
         {
@@ -29,6 +32,9 @@ namespace Conciliacao.Domain.Tests.Policies
             Assert.True(result);
         }
 
+        /// <summary>
+        /// Garante que IsMatch retorna false quando pelo menos uma regra da política composta não é satisfeita.
+        /// </summary>
         [Fact]
         public void IsMatch_Should_Return_False_When_Any_Rule_Is_Not_Satisfied()
         {

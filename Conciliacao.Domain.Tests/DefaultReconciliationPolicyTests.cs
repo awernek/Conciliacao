@@ -3,6 +3,9 @@ using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Domain.Tests
 {
+    /// <summary>
+    /// Testes da política padrão de conciliação (DefaultReconciliationPolicy) e tolerância de valor.
+    /// </summary>
     public class DefaultReconciliationPolicyTests
     {
         /// <summary>

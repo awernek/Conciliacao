@@ -8,6 +8,9 @@ using System.Net.Http.Json;
 
 namespace Conciliacao.Api.Tests.Reconciliation
 {
+    /// <summary>
+    /// Testes que garantem o comportamento de rollback quando ocorre erro no processamento do lote.
+    /// </summary>
     public class ReconciliationRollbackTests
         : IClassFixture<CustomWebApplicationFactory>
     {
@@ -20,6 +23,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
             _client = factory.CreateClient();
         }
 
+        /// <summary>
+        /// Garante que, quando ocorre erro durante o processamento do lote (ex.: referência TX_FAIL),
+        /// a API retorna 500 e nenhum dado da requisição é persistido (rollback implícito).
+        /// </summary>
         [Fact]
         public async Task Should_rollback_transaction_when_error_occurs()
         {

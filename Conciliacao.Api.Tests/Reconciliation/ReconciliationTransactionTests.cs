@@ -8,6 +8,9 @@ using System.Net.Http.Json;
 
 namespace Conciliacao.Api.Tests.Reconciliation
 {
+    /// <summary>
+    /// Testes que garantem o uso correto de transação/UnitOfWork (um commit por lote).
+    /// </summary>
     public class ReconciliationTransactionTests
         : IClassFixture<CustomWebApplicationFactory>
     {
@@ -20,6 +23,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
             _client = factory.CreateClient();
         }
 
+        /// <summary>
+        /// Garante que o UnitOfWork faz apenas um commit (uma chamada a SaveChanges) por requisição
+        /// de conciliação em lote, evitando múltiplas transações desnecessárias.
+        /// </summary>
         [Fact]
         public async Task Should_commit_only_once_per_batch()
         {

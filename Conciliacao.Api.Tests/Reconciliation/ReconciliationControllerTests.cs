@@ -6,6 +6,9 @@ using System.Net.Http.Json;
 
 namespace Conciliacao.Api.Tests.Reconciliation
 {
+    /// <summary>
+    /// Testes de integração do endpoint POST /api/reconciliation/batch (ReconciliationController).
+    /// </summary>
     public class ReconciliationControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         private readonly HttpClient _client;
@@ -34,6 +37,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
 
         #endregion
 
+        /// <summary>
+        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "matched"
+        /// quando existe uma transação e uma entrada externa com mesma referência, valor e data.
+        /// </summary>
         [Fact]
         public async Task POST_batch_should_return_matched_result()
         {
@@ -76,6 +83,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
             result.Extra.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "divergent"
+        /// quando referência e data batem, mas o valor difere além da tolerância do cliente.
+        /// </summary>
         [Fact]
         public async Task POST_batch_should_return_divergent_result()
         {
@@ -115,6 +126,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
             result.Extra.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "missing"
+        /// as transações que não possuem entrada externa correspondente.
+        /// </summary>
         [Fact]
         public async Task POST_batch_should_return_missing_result()
         {
@@ -148,6 +163,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
             result.Extra.Should().BeEmpty();
         }
 
+        /// <summary>
+        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "extra"
+        /// as entradas externas que não possuem transação correspondente.
+        /// </summary>
         [Fact]
         public async Task POST_batch_should_return_extra_result()
         {

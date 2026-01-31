@@ -10,6 +10,10 @@ namespace Conciliacao.Domain.Tests
     /// </summary>
     public class ReconciliationAppServiceTests
     {
+        /// <summary>
+        /// Garante que, quando transações e entradas externas têm referência, valor e data iguais,
+        /// o resultado contém exatamente um par em Matched e nenhum em Divergent, Missing ou Extra.
+        /// </summary>
         [Fact]
         public async Task ReconcileBatchAsync_Should_Match_When_Entries_Are_Equal()
         {

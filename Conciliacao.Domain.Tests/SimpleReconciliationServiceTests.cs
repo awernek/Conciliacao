@@ -10,6 +10,10 @@ namespace Conciliacao.Domain.Tests
     /// </summary>
     public class SimpleReconciliationServiceTests
     {
+        /// <summary>
+        /// Garante que o serviço classifica corretamente: um par como Matched (T1),
+        /// transações sem par como Missing e entradas externas sem par como Extra (T2).
+        /// </summary>
         [Fact]
         public void Reconcile_Should_Classify_Matched_Missing_And_Extra()
         {
