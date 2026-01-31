@@ -22,7 +22,7 @@ namespace Conciliacao.Domain.Tests.Policies
                 new FakeRule(true)
             };
             var policy = new CompositeReconciliationPolicy(rules);
-            var transaction = new Transaction();
+            var transaction = new Transaction("", "", 0, default);
             var external = new ExternalEntry();
 
             // Agir
@@ -46,7 +46,7 @@ namespace Conciliacao.Domain.Tests.Policies
                 new FakeRule(true)
             };
             var policy = new CompositeReconciliationPolicy(rules);
-            var transaction = new Transaction();
+            var transaction = new Transaction("", "", 0, default);
             var external = new ExternalEntry();
 
             // Agir

@@ -24,10 +24,17 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Conciliation>(entity =>
+            {
+                entity.HasKey(x => x.Id);
 
-            // Configurações via Fluent API
-            modelBuilder.ApplyConfigurationsFromAssembly(typeof(ConciliationDbContext).Assembly);
+                entity.Property(x => x.ExternalReference)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.HasIndex(x => x.ExternalReference)
+                      .IsUnique();
+            });
         }
     }
 }

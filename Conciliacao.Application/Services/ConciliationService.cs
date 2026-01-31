@@ -1,3 +1,5 @@
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Conciliacao.Application.Requests;
 using Conciliacao.Application.Results;
 using Conciliacao.Application.Services;
@@ -24,30 +26,59 @@ public class ConciliationService : IConciliationService
         ConciliationRequest request,
         string idempotencyKey)
     {
-        // 🔎 1. Já foi processado?
-        var processed = await _processedRequestRepository
-            .GetByKeyAsync(idempotencyKey);
-
-        if (processed != null)
-        {
-            return ConciliationResult.FromHash(processed.ResultHash);
-        }
-
-        // ⚙️ 2. Processa normalmente
+        // ⚙️ 1. Constrói as entidades de domínio
+        // Aqui NÃO tocamos banco ainda
         var transactions = request.ToTransactions();
 
-        await _transactionRepository.AddRangeAsync(transactions);
-
+        // 🧮 2. Calcula o resultado da conciliação
+        // Resultado é determinístico → pode ser reconstruído
         var result = ConciliationResult.SuccessResult(transactions.Count);
 
-        // 💾 3. Salva idempotência
-        await _processedRequestRepository.AddAsync(
-            new ProcessedRequest(idempotencyKey, result.ToHash())
-        );
+        try
+        {
+            // 💾 3. Persiste as transações
+            await _transactionRepository.AddRangeAsync(transactions);
 
-        // ✅ 4. Commit único
-        await _unitOfWork.CommitAsync();
+            // 🔐 4. Persiste a chave de idempotência
+            // IMPORTANTE:
+            // Existe um índice UNIQUE no banco para IdempotencyKey
+            // Se duas requisições concorrentes tentarem salvar a mesma chave,
+            // o banco irá garantir exclusividade
+            await _processedRequestRepository.AddAsync(
+                new ProcessedRequest(idempotencyKey, result.ToHash())
+            );
 
-        return result;
+            // ✅ 5. Commit único (transação atômica)
+            await _unitOfWork.CommitAsync();
+
+            return result;
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            // 🔁 6. Caso clássico de idempotência:
+            // Outra requisição já processou essa chave antes
+            // Recuperamos o resultado persistido e devolvemos
+            var processed = await _processedRequestRepository
+                                          .GetByKeyAsync(idempotencyKey);
+
+            if (processed == null)
+            {
+                throw new InvalidOperationException(
+                    "Idempotency conflict detected but processed request was not found.");
+            }
+
+            return ConciliationResult.FromHash(processed.ResultHash);
+        }
+    }
+
+    /// <summary>
+    /// Detecta violação de índice UNIQUE no SQL Server
+    /// 2601 → Cannot insert duplicate key row
+    /// 2627 → Violation of UNIQUE constraint
+    /// </summary>
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is SqlException sqlEx
+            && (sqlEx.Number == 2601 || sqlEx.Number == 2627);
     }
 }

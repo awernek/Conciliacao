@@ -4,6 +4,7 @@ using Conciliacao.Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Conciliacao.Infra.Migrations
 {
     [DbContext(typeof(ConciliationDbContext))]
-    partial class ConciliationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260131164400_InitialConciliationModel")]
+    partial class InitialConciliationModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,31 +24,6 @@ namespace Conciliacao.Infra.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Conciliacao.Domain.Entities.Conciliation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ExternalReference")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExternalReference")
-                        .IsUnique();
-
-                    b.ToTable("Conciliation");
-                });
 
             modelBuilder.Entity("Conciliacao.Domain.Entities.ExternalEntry", b =>
                 {
@@ -63,15 +41,17 @@ namespace Conciliacao.Infra.Migrations
 
                     b.Property<string>("Reference")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Source")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("ExternalEntries");
+                    b.ToTable("ExternalEntries", (string)null);
                 });
 
             modelBuilder.Entity("Conciliacao.Domain.Entities.ProcessedRequest", b =>
@@ -82,7 +62,8 @@ namespace Conciliacao.Infra.Migrations
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime>("ProcessedAt")
                         .HasColumnType("datetime2");
@@ -92,6 +73,9 @@ namespace Conciliacao.Infra.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
 
                     b.ToTable("ProcessedRequests");
                 });
@@ -108,17 +92,14 @@ namespace Conciliacao.Infra.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ExternalReference")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("Reference")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Transactions");
+                    b.ToTable("Transactions", (string)null);
                 });
 #pragma warning restore 612, 618
         }

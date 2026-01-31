@@ -1,4 +1,4 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Application.Requests
 {
@@ -9,10 +9,7 @@ namespace Conciliacao.Application.Requests
         public List<Transaction> ToTransactions()
         {
             return Items.Select(item =>
-                new Transaction(
-                    item.Reference,
-                    item.Amount
-                )
+                new Transaction("", item.Reference, item.Amount, default)
             ).ToList();
         }
     }

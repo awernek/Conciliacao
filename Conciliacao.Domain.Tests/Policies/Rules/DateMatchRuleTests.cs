@@ -17,7 +17,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var rule = new DateMatchRule();
-            var transaction = new Transaction("", 0, new DateTime(2025, 1, 10, 10, 30, 0));
+            var transaction = new Transaction("", "", 0, new DateTime(2025, 1, 10, 10, 30, 0));
             var external = new ExternalEntry { Date = new DateTime(2025, 1, 10, 18, 45, 0) };
 
             // Agir
@@ -35,7 +35,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var rule = new DateMatchRule();
-            var transaction = new Transaction("", 0, new DateTime(2025, 1, 10));
+            var transaction = new Transaction("", "", 0, new DateTime(2025, 1, 10));
             var external = new ExternalEntry { Date = new DateTime(2025, 1, 11) };
 
             // Agir

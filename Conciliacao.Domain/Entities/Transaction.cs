@@ -3,26 +3,26 @@ namespace Conciliacao.Domain.Entities
     public class Transaction
     {
         public Guid Id { get; private set; }
-        public Decimal Amount { get; private set; }
+        public decimal Amount { get; private set; }
         public DateTime Date { get; private set; }
         public string Reference { get; private set; } = string.Empty;
+        public string ExternalReference { get; private set; } = string.Empty;
 
-        public Transaction()
-        {
-            
-        }
+        //  Construtor protegido para o EF
+        protected Transaction() { }
 
-        public Transaction(string reference, decimal amount)
-        {
-            Id = Guid.NewGuid();
-            Amount = amount;
-            Reference = reference;
-        }
-
-        public Transaction(string reference, decimal amount, DateTime date)
+        //  Construtor principal do domínio
+        public Transaction(
+            string externalReference,
+            string reference,
+            decimal amount,
+            DateTime date)
         {
             Id = Guid.NewGuid();
-            Reference = reference;
+            ExternalReference = externalReference
+                ?? throw new ArgumentNullException(nameof(externalReference));
+
+            Reference = reference ?? string.Empty;
             Amount = amount;
             Date = date;
         }

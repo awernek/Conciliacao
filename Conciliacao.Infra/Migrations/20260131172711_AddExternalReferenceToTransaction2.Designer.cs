@@ -4,6 +4,7 @@ using Conciliacao.Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Conciliacao.Infra.Migrations
 {
     [DbContext(typeof(ConciliationDbContext))]
-    partial class ConciliationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260131172711_AddExternalReferenceToTransaction2")]
+    partial class AddExternalReferenceToTransaction2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
