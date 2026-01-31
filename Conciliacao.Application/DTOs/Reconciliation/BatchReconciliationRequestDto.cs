@@ -11,6 +11,9 @@ namespace Conciliacao.Application.DTOs.Reconciliation
             ExternalEntries = new List<ExternalEntryDto>();
         }
 
+        /// <summary>Chave de idempotência (opcional).</summary>
+        public string? IdempotencyKey { get; set; }
+
         /// <summary>Lista de transações a conciliar.</summary>
         public List<TransactionDto> Transactions { get; set; }
 

@@ -6,12 +6,7 @@ namespace Conciliacao.Application.Mappers
     public static class ReconciliationMapper
     {
         public static Transaction ToEntity(TransactionDto dto)
-            => new Transaction
-            {
-                Reference = dto.Reference,
-                Amount = dto.Amount,
-                Date = dto.Date
-            };
+            => new Transaction(dto.Reference, dto.Amount, dto.Date);
 
         public static ExternalEntry ToEntity(ExternalEntryDto dto)
             => new ExternalEntry

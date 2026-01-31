@@ -22,12 +22,7 @@ namespace Conciliacao.Domain.Tests
             var service = new SimpleReconciliationService(policy);
             var transactions = new[]
             {
-                new Transaction
-                {
-                    Reference = "T1",
-                    Amount = 100m,
-                    Date = new DateTime(2025, 1, 10)
-                }
+                new Transaction("T1", 100m, new DateTime(2025, 1, 10))
             };
 
             var externalEntries = new[]

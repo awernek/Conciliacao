@@ -20,13 +20,7 @@ namespace Conciliacao.Domain.Tests
         {
             // Preparar
             var policy = new DefaultReconciliationPolicy(0.05m);
-            var transaction = new Transaction
-            {
-                Reference = "ABC123",
-                Amount = 100.00m,
-                Date = new DateTime(2025, 1, 10)
-            };
-
+            var transaction = new Transaction("ABC123", 100.00m, new DateTime(2025, 1, 10));
             var externalEntry = new ExternalEntry
             {
                 Reference = "ABC123",
@@ -50,12 +44,7 @@ namespace Conciliacao.Domain.Tests
         {
             // Preparar
             var policy = new DefaultReconciliationPolicy(0.05m);
-            var transaction = new Transaction
-            {
-                Reference = "ABC123",
-                Amount = 100.00m,
-                Date = new DateTime(2025, 1, 10)
-            };
+            var transaction = new Transaction("ABC123", 100.00m, new DateTime(2025, 1, 10));
             var externalEntry = new ExternalEntry
             {
                 Reference = "ABC123",

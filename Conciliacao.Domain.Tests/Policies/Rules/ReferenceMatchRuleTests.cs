@@ -16,7 +16,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var rule = new ReferenceMatchRule();
-            var transaction = new Transaction { Reference = "ABC123" };
+            var transaction = new Transaction("ABC123", 0, default);
             var external = new ExternalEntry { Reference = "ABC123" };
 
             // Agir
@@ -34,7 +34,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var rule = new ReferenceMatchRule();
-            var transaction = new Transaction { Reference = "ABC123" };
+            var transaction = new Transaction("ABC123", 0, default);
             var external = new ExternalEntry { Reference = "XYZ999" };
 
             // Agir

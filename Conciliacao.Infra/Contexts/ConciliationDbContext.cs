@@ -15,6 +15,7 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
 
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<ExternalEntry> ExternalEntries { get; set; }
+        public DbSet<ProcessedRequest> ProcessedRequests { get; set; } = null!;
 
         public async Task CommitAsync()
         {
