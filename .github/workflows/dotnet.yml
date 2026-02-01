@@ -11,18 +11,45 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: SenhaForte123!
+        ports:
+          - 1433:1433
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Wait for SQL Server
+        run: sleep 20
+
+      - name: Install EF Core tools
+        run: |
+          dotnet tool install --global dotnet-ef
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Apply database migrations
+        run: dotnet ef database update --project Conciliacao.Infra --startup-project Conciliacao.Api --no-build
+        env:
+          ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=ConciliationDb;User Id=sa;Password=SenhaForte123!;Encrypt=True;TrustServerCertificate=True"
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+        env:
+          ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=ConciliationDb;User Id=sa;Password=SenhaForte123!;Encrypt=True;TrustServerCertificate=True"
