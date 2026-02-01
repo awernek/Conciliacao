@@ -4,6 +4,7 @@ using Conciliacao.Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Conciliacao.Infra.Migrations
 {
     [DbContext(typeof(ConciliationDbContext))]
-    partial class ConciliationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260131175820_AddUniqueIndex_ProcessedRequests_IdempotencyKey")]
+    partial class AddUniqueIndex_ProcessedRequests_IdempotencyKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -74,6 +77,28 @@ namespace Conciliacao.Infra.Migrations
                     b.ToTable("ExternalEntries");
                 });
 
+            modelBuilder.Entity("Conciliacao.Domain.Entities.ProcessedRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResultHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ProcessedRequests");
+                });
+
             modelBuilder.Entity("Conciliacao.Domain.Entities.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -97,29 +122,6 @@ namespace Conciliacao.Infra.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Transactions");
-                });
-
-            modelBuilder.Entity("ProcessedRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("IdempotencyKey")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("ResultHash")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique();
-
-                    b.ToTable("ProcessedRequests");
                 });
 #pragma warning restore 612, 618
         }

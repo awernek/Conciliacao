@@ -35,6 +35,16 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
                 entity.HasIndex(x => x.ExternalReference)
                       .IsUnique();
             });
+
+            modelBuilder.Entity<ProcessedRequest>(entity =>
+            {
+                entity.Property(e => e.IdempotencyKey)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.HasIndex(e => e.IdempotencyKey)
+                    .IsUnique();
+            });
         }
     }
 }
