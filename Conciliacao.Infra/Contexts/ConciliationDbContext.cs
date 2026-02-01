@@ -1,4 +1,4 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +24,8 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
+
             modelBuilder.Entity<Conciliation>(entity =>
             {
                 entity.HasKey(x => x.Id);
@@ -31,6 +33,9 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
                 entity.Property(x => x.ExternalReference)
                       .IsRequired()
                       .HasMaxLength(100);
+
+                entity.Property(x => x.Amount)
+                      .HasPrecision(18, 2);
 
                 entity.HasIndex(x => x.ExternalReference)
                       .IsUnique();
