@@ -9,31 +9,30 @@ Sistema de reconciliação automatizada de transações financeiras, construído
 
 - [Visão Geral](#-visão-geral)
 - [Arquitetura](#-arquitetura)
-- [Modelo de Domínio](#-modelo-de-domínio)
 - [API REST](#-api-rest)
 - [Camada de Aplicação](#-camada-de-aplicação)
+- [Infraestrutura](#-infraestrutura)
 - [Políticas por Cliente](#-políticas-por-cliente)
-- [Políticas e Regras](#-políticas-e-regras)
-- [Fluxo de Reconciliação](#-fluxo-de-reconciliação)
+- [Idempotência e Concorrência](#-idempotência-e-concorrência)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Quick Start](#-quick-start)
 - [Decisões de Design](#-decisões-de-design)
-- [Extensibilidade](#-extensibilidade)
+- [Documentação Adicional](#-documentação-adicional)
 - [Roadmap](#-roadmap)
 - [Licença](#-licença)
 
 ## 🎯 Visão Geral
 
-O Sistema de Conciliação Financeira automatiza a reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways, APIs). Inclui **API REST** com Swagger, **política de conciliação por cliente** e **DTOs** para contrato da API.
+O Sistema de Conciliação Financeira automatiza a reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways, APIs). Oferece **dois fluxos de API**: conciliação em lote com persistência (Reconciliation) e conciliação idempotente (Conciliation).
 
 ### Principais Funcionalidades
 
-- ✅ **API REST**: `POST /api/reconciliation/batch` com request/response em DTO
-- ✅ **Swagger/OpenAPI** para documentação e testes da API
-- ✅ **Política por cliente**: `IReconciliationPolicyFactory` cria a política conforme `ClientCode` (CLIENT_A, CLIENT_B, CLIENT_C)
-- ✅ **Application**: `ReconciliationAppService` recebe `ReconciliationBatchRequestDto`, valida, mapeia e delega para `InternalBatchReconciliationService`
-- ✅ **Domain**: `SimpleReconciliationService` (itens) e regras composáveis (`IReconciliationRule` + `CompositeReconciliationPolicy`)
-- ✅ **Testes**: unitários (Domain, Application, Rules) e **testes de API** com `WebApplicationFactory`
+- ✅ **POST /api/reconciliation/batch** — Conciliação em lote: persiste transações e entradas externas, executa matching por política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um único commit** no final (rollback implícito em erro).
+- ✅ **POST /api/conciliation** — Conciliação **idempotente**: header `Idempotency-Key` obrigatório; requisições com a mesma chave retornam o resultado já salvo sem reprocessar (índice UNIQUE + tratamento de concorrência).
+- ✅ **Persistência** — Entity Framework Core, SQL Server; repositórios (Transaction, ExternalEntry, ProcessedRequest), Unit of Work (DbContext como IUnitOfWork).
+- ✅ **Política por cliente** — `IReconciliationPolicyFactory` cria a política conforme `clientCode` (CLIENT_A, CLIENT_B, CLIENT_C).
+- ✅ **Testes** — Unitários (Domain, Application, Rules) e testes de API (WebApplicationFactory), incluindo transação (um commit por batch), rollback e idempotência/concorrência.
+- ✅ **CI** — GitHub Actions (build + test no branch `master`).
 
 ## 🏗️ Arquitetura
 
@@ -43,166 +42,85 @@ O Sistema de Conciliação Financeira automatiza a reconciliação entre transa�
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      SISTEMA DE CONCILIAÇÃO                             │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│    ┌──────────┐         ┌──────────────────┐         ┌───────────┐       │
-│    │ Sistema  │         │                  │         │  Bancos   │       │
-│    │ Interno  │────────▶│  Reconciliation  │◀────────│  ERPs     │       │
-│    │(ERP/Core)│         │     Engine       │         │  Gateways │       │
-│    └──────────┘         └──────────────────┘         └───────────┘       │
-│          │                       │                         │             │
-│          ▼                       ▼                         ▼             │
-│    ┌──────────┐         ┌──────────────────┐     ┌──────────────┐       │
-│    │Transactions│        │BatchResponseDto  │     │ExternalEntries│      │
-│    └──────────┘         │ Matched|Divergent|Missing|Extra         │     └──────────────┘
-│                         └──────────────────┘                             │
+│    ┌──────────┐         ┌──────────────────┐         ┌───────────┐        │
+│    │ Sistema  │         │                  │         │  Bancos   │        │
+│    │ Interno  │────────▶│  Reconciliation │◀────────│  ERPs     │        │
+│    │(ERP/Core)│         │  + Conciliation  │         │  Gateways │        │
+│    └──────────┘         └──────────────────┘         └───────────┘        │
+│          │                       │                         │              │
+│          ▼                       ▼                         ▼              │
+│    Transactions           BatchResponseDto /         ExternalEntries      │
+│    ExternalEntries        ConciliationResult        ProcessedRequests     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Arquitetura em Camadas
+### Camadas
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    API Layer (ASP.NET Core)                             │
-│  ReconciliationController  │  POST /api/reconciliation/batch            │
+│  API (Controllers)                                                       │
+│  ReconciliationController  → POST /api/reconciliation/batch?clientCode=  │
+│  ConciliationController    → POST /api/conciliation (Idempotency-Key)   │
 │  Swagger / OpenAPI                                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                    Application Layer                                     │
-│  ReconciliationAppService     → ReconcileBatch(ReconciliationBatchRequestDto)  │
-│  InternalBatchReconciliationService  → Execute(transactions, entries)  │
-│  IReconciliationPolicyFactory / ReconciliationPolicyFactory  → CreateFor(Client) │
-│  ReconciliationMapper         → ToEntity / ToDto                         │
-│  DTOs: Request, Response, TransactionDto, ExternalEntryDto, MatchedPairDto, DivergenceDto │
+│  Application                                                             │
+│  ReconciliationAppService  → ReconcileBatchAsync (persiste + concilia + commit) │
+│  ConciliationService      → ConciliateAsync (idempotente, ProcessedRequest)   │
+│  InternalBatchReconciliationService, PolicyFactory, Mapper, DTOs/Requests/Results │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                         Domain Layer                                     │
-│  Entities: Transaction, ExternalEntry, ReconciliationItem, Client      │
-│  ValueObjects: Money                                                     │
-│  SimpleReconciliationService  → Reconcile() → ReconciliationItem[]       │
-│  IReconciliationPolicy / IReconciliationRule                            │
-│  DefaultReconciliationPolicy | CompositeReconciliationPolicy             │
-│  ReferenceMatchRule, DateMatchRule, AmountToleranceRule, FakeRule       │
+│  Domain                                                                  │
+│  Entities: Transaction, ExternalEntry, Client, ReconciliationItem, ProcessedRequest │
+│  Repositories: ITransactionRepository, IExternalEntryRepository, IProcessedRequestRepository, IUnitOfWork │
+│  Policies/Rules, SimpleReconciliationService, Money                      │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                   Infrastructure Layer                                   │
-│                        [Em desenvolvimento]                              │
+│  Infrastructure                                                           │
+│  ConciliationDbContext (IUnitOfWork), SqlServer                           │
+│  TransactionRepository, ExternalEntryRepository, ProcessedRequestRepository │
+│  Configurations, Migrations                                              │
 └─────────────────────────────────────────────────────────────────────────┘
-```
-
-## 📊 Modelo de Domínio
-
-```mermaid
-classDiagram
-    class Transaction {
-        +int Id
-        +decimal Amount
-        +DateTime Date
-        +string Reference
-    }
-    
-    class ExternalEntry {
-        +int Id
-        +decimal Amount
-        +DateTime Date
-        +string Reference
-        +string Source
-    }
-    
-    class Client {
-        +string Code
-    }
-    
-    class ReconciliationItem {
-        +Transaction? Transaction
-        +ExternalEntry? ExternalEntry
-        +ReconciliationResult Result
-    }
-    
-    class IReconciliationPolicy {
-        <<interface>>
-        +IsMatch(Transaction, ExternalEntry) bool
-    }
-    
-    class IReconciliationRule {
-        <<interface>>
-        +IsSatisfied(Transaction, ExternalEntry) bool
-    }
-    
-    class IReconciliationPolicyFactory {
-        <<interface>>
-        +CreateFor(Client) IReconciliationPolicy
-    }
-    
-    class ReconciliationPolicyFactory {
-        CreateFor(Client)
-    }
-    
-    class ReconciliationBatchRequestDto {
-        +string ClientCode
-        +List~TransactionDto~ Transactions
-        +List~ExternalEntryDto~ ExternalEntries
-    }
-    
-    class ReconciliationBatchResponseDto {
-        +List~MatchedPairDto~ Matched
-        +List~DivergenceDto~ Divergent
-        +List~TransactionDto~ Missing
-        +List~ExternalEntryDto~ Extra
-    }
-    
-    ReconciliationAppService --> IReconciliationPolicyFactory
-    ReconciliationPolicyFactory ..|> IReconciliationPolicyFactory
-    ReconciliationPolicyFactory --> IReconciliationPolicy
-    CompositeReconciliationPolicy --> IReconciliationRule
 ```
 
 ## 🌐 API REST
 
-### Endpoint
+### 1. Conciliação em lote (persistência + matching)
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| **POST** | `/api/reconciliation/batch` | Concilia um lote de transações e entradas externas por cliente |
+| **POST** | `/api/reconciliation/batch?clientCode={clientCode}` | Persiste transações e entradas externas, concilia com a política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um commit** no final. |
 
-### Request: ReconciliationBatchRequestDto
+- **clientCode** (query, obrigatório): define a política (ex.: CLIENT_A, CLIENT_B, CLIENT_C).
+- **Body**: `BatchReconciliationRequestDto` — `transactions`, `externalEntries`; opcional `idempotencyKey`.
+- **Response**: `ReconciliationBatchResponseDto` (Matched, Divergent, Missing, Extra).
+- Em erro: 500; o UoW não faz commit (rollback implícito).
 
-```json
-{
-  "clientCode": "CLIENT_A",
-  "transactions": [
-    { "reference": "TX1", "amount": 100.00, "date": "2025-01-10" }
-  ],
-  "externalEntries": [
-    { "reference": "TX1", "amount": 100.00, "date": "2025-01-10" }
-  ]
-}
-```
+### 2. Conciliação idempotente
 
-### Response: ReconciliationBatchResponseDto
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| **POST** | `/api/conciliation` | Processa a conciliação de forma **idempotente**. Header **Idempotency-Key** obrigatório. |
 
-```json
-{
-  "matched": [
-    {
-      "transaction": { "reference": "TX1", "amount": 100.00, "date": "2025-01-10" },
-      "externalEntry": { "reference": "TX1", "amount": 100.00, "date": "2025-01-10" }
-    }
-  ],
-  "divergent": [],
-  "missing": [],
-  "extra": []
-}
-```
-
-- **ClientCode** é obrigatório; a política de conciliação é escolhida conforme o cliente (veja [Políticas por Cliente](#-políticas-por-cliente)).
-- Após subir a API, a documentação interativa fica em **Swagger UI** (ex.: `https://localhost:5xxx/swagger`).
+- **Header**: `Idempotency-Key` (obrigatório) — ex.: GUID ou valor único por operação.
+- **Body**: `ConciliationRequest` — `items` (reference, amount).
+- **Response**: `ConciliationResult` — `success`, `processedCount`.
+- Comportamento: primeira requisição com chave X → processa e persiste transações + ProcessedRequest; segunda requisição com a **mesma** chave X → não reprocessa, retorna o resultado já salvo (índice UNIQUE no banco; concorrência tratada com catch em violação de UNIQUE).
 
 ## 📦 Camada de Aplicação
 
 | Componente | Descrição |
 |------------|-----------|
-| **ReconciliationAppService** | Recebe `ReconciliationBatchRequestDto`, valida (ClientCode, Transactions não vazia), obtém política via `IReconciliationPolicyFactory.CreateFor(Client)`, mapeia DTO→Entity, chama `InternalBatchReconciliationService.Execute`, mapeia resultado para `ReconciliationBatchResponseDto`. |
-| **InternalBatchReconciliationService** | Recebe entidades de domínio e `IReconciliationPolicy`; executa o algoritmo de batch (indexação por Reference, Matched/Divergent/Missing/Extra); retorna `ReconciliationBatchResult`. |
-| **IReconciliationPolicyFactory** | Cria a política de conciliação para um `Client` (por código). |
-| **ReconciliationMapper** | ToEntity/ToDto para `Transaction` e `ExternalEntry`. |
-| **ReconciliationBatchResult** | Modelo de domínio da aplicação: listas Matched, Divergent, Missing, Extra. |
+| **ReconciliationAppService** | Recebe `Client` e listas de `TransactionDto`/`ExternalEntryDto`. Mapeia DTO→Entity, **persiste** (repositórios), obtém política via factory, executa **InternalBatchReconciliationService**, mapeia resultado para **ReconciliationBatchResponseDto**, chama **CommitAsync()** e retorna. Um único commit por request; em exceção, nada é gravado. |
+| **InternalBatchReconciliationService** | Recebe entidades e `IReconciliationPolicy`. Emparelha por Reference; classifica em Matched/Divergent/Missing/Extra. Retorna **ReconciliationBatchResult**. |
+| **ConciliationService** | Fluxo idempotente: monta transações a partir de **ConciliationRequest**, persiste transações e **ProcessedRequest** (idempotencyKey + resultHash). Em violação de UNIQUE (concorrência), busca ProcessedRequest pela chave e retorna **ConciliationResult** a partir do payload salvo. |
+| **IReconciliationPolicyFactory** | Cria `IReconciliationPolicy` para um `Client` (CLIENT_A, CLIENT_B, CLIENT_C). |
+| **ReconciliationMapper** | ToEntity/ToDto para Transaction e ExternalEntry. |
+
+## 🗄️ Infraestrutura
+
+- **ConciliationDbContext** — EF Core, SQL Server; implementa **IUnitOfWork** (CommitAsync = SaveChangesAsync). DbSets: Transactions, ExternalEntries, ProcessedRequests.
+- **Repositórios** — TransactionRepository, ExternalEntryRepository, ProcessedRequestRepository (implementam interfaces do Domain).
+- **Configurations** — mapeamento EF para Transaction, ExternalEntry, ProcessedRequest.
+- **Migrations** — esquema inicial e índices (ex.: UNIQUE em ProcessedRequests.IdempotencyKey, ExternalEntry.Reference).
+- Em ambiente **Testing** (ex.: testes de API), o Program.cs não registra o DbContext real; os testes usam fakes (FakeTransactionRepository, FakeExternalEntryRepository, TestConciliationDbContext, etc.).
 
 ## 👤 Políticas por Cliente
 
@@ -214,129 +132,76 @@ A **ReconciliationPolicyFactory** define políticas por código de cliente:
 | **CLIENT_B** | Reference + Date + Amount | 0,00 (exata) |
 | **CLIENT_C** | Reference + Amount (sem Date) | 0,10 |
 
-Cliente não configurado lança `InvalidOperationException`. Novos clientes podem ser adicionados na factory ou via configuração futura.
+## 🔐 Idempotência e Concorrência
 
-## 🔧 Políticas e Regras
+- **Idempotência**: fluxo `POST /api/conciliation` com header `Idempotency-Key`. ProcessedRequest armazena chave + hash do resultado; requisições repetidas retornam o resultado já persistido (FromPayload).
+- **Concorrência**: índice UNIQUE em `ProcessedRequests.IdempotencyKey`; duas requisições simultâneas com a mesma chave — uma insere, a outra recebe DbUpdateException (violação de UNIQUE), busca o ProcessedRequest pela chave e retorna o resultado já salvo.
+- **Consistência no batch**: ReconciliationAppService persiste primeiro, concilia e mapeia; **só no final** chama CommitAsync(). Se algo falhar antes, nada é gravado. Controller com try/catch retorna 500 sem commit.
 
-### 1. Política única: DefaultReconciliationPolicy
-
-Referência igual, mesma data (dia) e valor dentro da tolerância.
-
-```csharp
-var policy = new DefaultReconciliationPolicy(tolerance: 0.01m);
-```
-
-### 2. Políticas composáveis: IReconciliationRule + CompositeReconciliationPolicy
-
-| Regra | Descrição |
-|-------|-----------|
-| **ReferenceMatchRule** | `transaction.Reference == externalEntry.Reference` |
-| **DateMatchRule** | Mesmo dia (ignora hora) |
-| **AmountToleranceRule** | Valor dentro da tolerância (usa `Money`) |
-| **FakeRule** | Retorno fixo (útil em testes) |
-
-```csharp
-var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
-{
-    new ReferenceMatchRule(),
-    new DateMatchRule(),
-    new AmountToleranceRule(0.01m)
-});
-```
-
-O **Domain** expõe ainda o **SimpleReconciliationService**, que recebe qualquer `IReconciliationPolicy` e retorna `IReadOnlyCollection<ReconciliationItem>`.
-
-## 🔄 Fluxo de Reconciliação
-
-### Via API (ReconciliationAppService + InternalBatchReconciliationService)
-
-```
-Request DTO (ClientCode, Transactions, ExternalEntries)
-  → Validação (ClientCode obrigatório, Transactions não vazia)
-  → Client + IReconciliationPolicyFactory.CreateFor(Client)
-  → ReconciliationMapper.ToEntity (DTO → Domain)
-  → InternalBatchReconciliationService.Execute(transactions, externalEntries)
-  → ReconciliationBatchResult
-  → ReconciliationMapper.ToDto (Domain → DTO)
-  → ReconciliationBatchResponseDto
-```
-
-### Algoritmo do batch (InternalBatchReconciliationService)
-
-```
-Indexar ExternalEntries por Reference
-Para cada Transaction:
-  se não existe externo com mesma Reference → Missing.Add(transaction)
-  senão:
-    marcar referência como usada
-    se Policy.IsMatch(tx, ext) → Matched.Add((tx, ext))
-    senão → Divergent.Add((tx, ext))
-Para cada ExternalEntry cuja Reference não foi usada → Extra.Add(ext)
-```
+Detalhes: [docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md](docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md).
 
 ## 📁 Estrutura do Projeto
 
 ```
 Conciliacao/
-├── Conciliacao.Api/                          # Web API
+├── .github/workflows/
+│   └── dotnet.yml                    # CI: build + test (master)
+├── Conciliacao.Api/
 │   ├── Controllers/
-│   │   └── ReconciliationController.cs       # POST /api/reconciliation/batch
-│   └── Program.cs                           # Swagger, DI: PolicyFactory, ReconciliationAppService
-├── Conciliacao.Api.Tests/                   # Testes de API
+│   │   ├── ReconciliationController.cs   # POST /api/reconciliation/batch?clientCode=
+│   │   └── ConciliationController.cs     # POST /api/conciliation (Idempotency-Key)
+│   └── Program.cs                    # Swagger, DI: repos, UoW, PolicyFactory, AppService, ConciliationService
+├── Conciliacao.Api.Tests/
 │   ├── Fixtures/
-│   │   └── CustomWebApplicationFactory.cs
+│   │   ├── CustomWebApplicationFactory.cs
+│   │   ├── FakeTransactionRepository.cs, FakeExternalEntryRepository.cs
+│   ├── Infrastructure/               # TestConciliationDbContext, FailingTransactionRepository, etc.
+│   ├── Integration/Idempotency/
+│   │   └── ConciliationConcurrencyTests.cs
 │   └── Reconciliation/
-│       └── ReconciliationControllerTests.cs
+│       ├── ReconciliationControllerTests.cs
+│       ├── ReconciliationTransactionTests.cs   # Um commit por batch
+│       └── ReconciliationRollbackTests.cs      # Rollback em erro
 ├── Conciliacao.Application/
-│   ├── DTOs/Reconciliation/
-│   │   ├── ReconciliationBatchRequestDto.cs
-│   │   ├── ReconciliationBatchResponseDto.cs
-│   │   ├── TransactionDto.cs, ExternalEntryDto.cs
-│   │   ├── MatchedPairDto.cs, DivergenceDto.cs
-│   │   └── ...
-│   ├── Factories/
-│   │   ├── IReconciliationPolicyFactory.cs
-│   │   └── ReconciliationPolicyFactory.cs
-│   ├── Mappers/
-│   │   └── ReconciliationMapper.cs
-│   ├── Models/
-│   │   └── ReconciliationBatchResult.cs
+│   ├── DTOs/Reconciliation/           # BatchReconciliationRequestDto, ReconciliationBatchResponseDto, TransactionDto, etc.
+│   ├── Requests/                      # ConciliationRequest, ConciliationItem
+│   ├── Results/                       # ConciliationResult
+│   ├── Factories/                     # IReconciliationPolicyFactory, ReconciliationPolicyFactory
+│   ├── Mappers/                       # ReconciliationMapper
+│   ├── Models/                        # ReconciliationBatchResult
 │   └── Services/
 │       ├── ReconciliationAppService.cs
-│       └── InternalBatchReconciliationService.cs
+│       ├── InternalBatchReconciliationService.cs
+│       ├── ConciliationService.cs
+│       └── IConciliationService.cs
 ├── Conciliacao.Domain/
-│   ├── Entities/
-│   │   ├── Transaction.cs, ExternalEntry.cs, ReconciliationItem.cs
-│   │   └── Client.cs
-│   ├── ValueObjects/Money.cs
-│   ├── Policies/
-│   │   ├── IReconciliationPolicy.cs, IReconciliationRule.cs
-│   │   ├── DefaultReconciliationPolicy.cs, CompositeReconciliationPolicy.cs
-│   │   ├── ReferenceMatchRule.cs, DateMatchRule.cs, AmountToleranceRule.cs
-│   │   └── FakeRule.cs
-│   └── Services/
-│       └── SimpleReconciliationService.cs
+│   ├── Entities/                     # Transaction, ExternalEntry, Client, ReconciliationItem, ProcessedRequest
+│   ├── Repositories/                 # ITransactionRepository, IExternalEntryRepository, IProcessedRequestRepository, IUnitOfWork
+│   ├── Policies/                     # IReconciliationPolicy, IReconciliationRule, Composite, Default, Rules, FakeRule
+│   ├── Services/                     # SimpleReconciliationService
+│   └── ValueObjects/                 # Money
+├── Conciliacao.Infra/
+│   ├── Contexts/                     # ConciliationDbContext, ConciliationDbContextFactory
+│   ├── Repositories/                 # TransactionRepository, ExternalEntryRepository, ProcessedRequestRepository
+│   ├── Persistence/                  # UnitOfWork (alternativa; Program usa DbContext como IUnitOfWork)
+│   ├── Configurations/               # EF configurations
+│   └── Migrations/
 ├── Conciliacao.Domain.Tests/
-│   ├── SimpleReconciliationServiceTests.cs
-│   ├── ReconciliationAppServiceTests.cs
-│   ├── ReconciliationAppServiceFlowTests.cs
-│   ├── DefaultReconciliationPolicyTests.cs
-│   ├── CompositeReconciliationPolicyTests.cs
-│   ├── MoneyTests.cs
-│   ├── FakeReconciliationPolicyFactory.cs
-│   └── Policies/Rules/
-│       ├── ReferenceMatchRuleTests.cs
-│       ├── DateMatchRuleTests.cs
-│       └── AmountToleranceRuleTests.cs
-└── Conciliacao.Infra/                        # [Em desenvolvimento]
+│   ├── SimpleReconciliationServiceTests.cs, ReconciliationAppServiceTests.cs, ReconciliationAppServiceFlowTests.cs
+│   ├── DefaultReconciliationPolicyTests.cs, CompositeReconciliationPolicyTests.cs, MoneyTests.cs
+│   ├── FakeReconciliationPolicyFactory.cs, FakeTransactionRepository.cs, FakeExternalEntryRepository.cs, FakeUnitOfWork.cs
+│   └── Policies/Rules/               # ReferenceMatchRuleTests, etc.
+└── docs/
+    └── ARQUITETURA-E-FLUXO-CONCILIACAO.md   # Fluxo detalhado e diagramas
 ```
 
 ## 🚀 Quick Start
 
 ### Pré-requisitos
 
-- .NET 10 SDK  
-- Git  
+- .NET 10 SDK (ou a versão do projeto)
+- Git
+- SQL Server (ou LocalDB) para rodar a API com persistência real
 
 ### Instalação e execução
 
@@ -345,14 +210,22 @@ git clone https://github.com/awernek/Conciliacao.git
 cd Conciliacao
 dotnet build
 dotnet test
+```
+
+Configure a connection string **DefaultConnection** em `appsettings.json` (ou `appsettings.Development.json`) para o ambiente desejado. Em ambiente **Testing**, a API usa fakes (não precisa de banco).
+
+```bash
 dotnet run --project Conciliacao.Api
 ```
 
-Acesse o Swagger (URL exibida no console, ex.: `https://localhost:5001/swagger`) e teste `POST /api/reconciliation/batch` com um body como:
+Acesse o Swagger (ex.: `https://localhost:5xxx/swagger`).
 
+### Exemplo: POST /api/reconciliation/batch
+
+- **URL**: `POST /api/reconciliation/batch?clientCode=CLIENT_A`
+- **Body**:
 ```json
 {
-  "clientCode": "CLIENT_A",
   "transactions": [
     { "reference": "TX1", "amount": 100, "date": "2025-01-10" }
   ],
@@ -362,79 +235,45 @@ Acesse o Swagger (URL exibida no console, ex.: `https://localhost:5001/swagger`)
 }
 ```
 
-### Exemplo: uso direto do Domain (SimpleReconciliationService)
+### Exemplo: POST /api/conciliation (idempotente)
 
-```csharp
-using Conciliacao.Domain.Policies;
-using Conciliacao.Domain.Services;
-
-var policy = new DefaultReconciliationPolicy(tolerance: 0.01m);
-var service = new SimpleReconciliationService(policy);
-var results = service.Reconcile(transactions, externalEntries);
-```
-
-### Exemplo: uso da Application (ReconciliationAppService com DTO)
-
-```csharp
-using Conciliacao.Application.DTOs;
-using Conciliacao.Application.DTOs.Reconciliation;
-using Conciliacao.Application.Services;
-
-// Assumindo factory injetada (ex.: em controller ou teste)
-var appService = new ReconciliationAppService(policyFactory);
-var request = new ReconciliationBatchRequestDto
+- **URL**: `POST /api/conciliation`
+- **Header**: `Idempotency-Key: <GUID ou valor único>`
+- **Body**:
+```json
 {
-    ClientCode = "CLIENT_A",
-    Transactions = new List<TransactionDto> { ... },
-    ExternalEntries = new List<ExternalEntryDto> { ... }
-};
-var response = appService.ReconcileBatch(request);
+  "items": [
+    { "reference": "REF-001", "amount": 100.50 },
+    { "reference": "REF-002", "amount": 200.00 }
+  ]
+}
 ```
 
 ## 💡 Decisões de Design
 
 | Decisão | Motivação |
 |---------|-----------|
-| **Política por cliente (Factory)** | Cada cliente pode ter regras/tolerâncias diferentes sem alterar o fluxo da aplicação. |
-| **DTOs para API** | Contrato estável entre API e clientes; Domain permanece independente do transporte. |
-| **InternalBatchReconciliationService** | Lógica de batch em um serviço dedicado; AppService orquestra validação, factory, mapeamento e chamada. |
-| **ReconciliationMapper estático** | Mapeamento DTO ↔ Entity em um único lugar, reutilizável. |
-| **IReconciliationRule + Composite** | Regras atômicas e composição permitem políticas por cliente (ex.: CLIENT_C sem DateMatchRule). |
-| **Testes de API com WebApplicationFactory** | Testes de integração da API sem mock do host; validação de contrato e status HTTP. |
+| **Dois fluxos de API** | Reconciliation batch: persistência + matching por cliente. Conciliation: idempotência e segurança em concorrência (ProcessedRequest + UNIQUE). |
+| **Um commit por batch** | ReconciliationAppService persiste tudo, concilia e mapeia; CommitAsync() só no final. Falha antes = nada gravado. |
+| **DbContext como IUnitOfWork** | Um único SaveChangesAsync por request; rollback implícito em exceção. |
+| **Política por cliente (Factory)** | Regras/tolerâncias diferentes por cliente sem alterar o fluxo. |
+| **InternalBatchReconciliationService** | Lógica de matching isolada; AppService orquestra persistência, factory e mapeamento. |
+| **ProcessedRequest + UNIQUE** | Idempotência e tratamento de concorrência (apenas uma inserção por chave; demais retornam resultado já salvo). |
 
-## 🔧 Extensibilidade
+## 📚 Documentação Adicional
 
-### Adicionar novo cliente na factory
-
-Em `ReconciliationPolicyFactory.CreateFor(Client)`:
-
-```csharp
-"CLIENT_D" => new CompositeReconciliationPolicy(new IReconciliationRule[]
-{
-    new ReferenceMatchRule(),
-    new DateMatchRule(),
-    new AmountToleranceRule(0.02m)
-}),
-```
-
-### Nova regra (IReconciliationRule)
-
-```csharp
-public class SourceWhitelistRule : IReconciliationRule
-{
-    private readonly HashSet<string> _allowed;
-    public SourceWhitelistRule(params string[] sources) => _allowed = new HashSet<string>(sources);
-    public bool IsSatisfied(Transaction tx, ExternalEntry ext) => _allowed.Contains(ext.Source);
-}
-```
+- [docs/ARQUITETURA-E-FLUXO-CONCILIACAO.md](docs/ARQUITETURA-E-FLUXO-CONCILIACAO.md) — Arquitetura, fluxo da conciliação em lote, diagramas (sequência, políticas, camadas).
+- [docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md](docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md) — Idempotência, concorrência e consistência no banco.
 
 ## 🗺️ Roadmap
 
-- [x] API REST com endpoint de conciliação em lote
+- [x] API REST: conciliação em lote (persistência + matching)
+- [x] API REST: conciliação idempotente (Idempotency-Key)
 - [x] Swagger/OpenAPI
-- [x] Política de conciliação por cliente
-- [x] Testes de API (WebApplicationFactory)
-- [ ] Persistência com Entity Framework Core
+- [x] Persistência com Entity Framework Core (SQL Server)
+- [x] Unit of Work, repositórios, testes de transação e rollback
+- [x] Testes de idempotência/concorrência
+- [x] CI (GitHub Actions, master)
 - [ ] Suporte multi-moeda
 - [ ] Processamento assíncrono (mensageria)
 - [ ] Dashboard e exportação de relatórios

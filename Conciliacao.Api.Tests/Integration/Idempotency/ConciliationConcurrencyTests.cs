@@ -29,7 +29,7 @@ public class ConciliationServiceConcurrencyTests
 
         var request = new ConciliationRequest
         {
-            // ⚠️ Ajuste conforme seu domínio
+            // Ajuste conforme seu domínio
             // Exemplo:
             // Items = new[] { new ConciliationItem { Amount = 100 } }
         };
@@ -89,7 +89,7 @@ public class ConciliationServiceConcurrencyTests
         services.AddScoped<IProcessedRequestRepository, ProcessedRequestRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
 
-        // ✅ Unit of Work concreto
+        // Unit of Work concreto
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IConciliationService, ConciliationService>();
