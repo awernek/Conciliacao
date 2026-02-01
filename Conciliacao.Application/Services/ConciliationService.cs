@@ -5,7 +5,9 @@ using Conciliacao.Domain.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
-public class ConciliationService : IConciliationService
+namespace Conciliacao.Application.Services
+{
+    public class ConciliationService : IConciliationService
 {
     private readonly IProcessedRequestRepository _processedRequestRepository;
     private readonly ITransactionRepository _transactionRepository;
@@ -44,7 +46,7 @@ public class ConciliationService : IConciliationService
             // - Apenas uma irá conseguir inserir
             var processedRequest = new ProcessedRequest(
                 idempotencyKey,
-                result.ToHash()
+                result.ToPayload()
             );
 
             await _processedRequestRepository.AddAsync(processedRequest);
@@ -70,8 +72,8 @@ public class ConciliationService : IConciliationService
                     "Idempotency conflict detected, but processed request was not found.");
             }
 
-            // 7️⃣ Reconstrói o resultado a partir do hash salvo
-            return ConciliationResult.FromHash(processed.ResultHash);
+            // 7️⃣ Reconstrói o resultado a partir do payload salvo (idempotência: mesmo resultado)
+            return ConciliationResult.FromPayload(processed.ResultHash);
         }
     }
 
@@ -85,4 +87,5 @@ public class ConciliationService : IConciliationService
         return ex.InnerException is SqlException sqlEx
             && (sqlEx.Number == 2601 || sqlEx.Number == 2627);
     }
+}
 }

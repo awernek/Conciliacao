@@ -1,4 +1,4 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
 using Conciliacao.Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -21,10 +21,10 @@ namespace Conciliacao.Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey);
         }
 
-        public async Task AddAsync(ProcessedRequest request)
+        public Task AddAsync(ProcessedRequest request)
         {
             _context.ProcessedRequests.Add(request);
-            await _context.SaveChangesAsync();
+            return Task.CompletedTask;
         }
     }
 }

@@ -25,11 +25,13 @@ if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
     builder.Services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
     builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
+    builder.Services.AddScoped<IProcessedRequestRepository, ProcessedRequestRepository>();
 }
 
 // Application
 builder.Services.AddScoped<IReconciliationPolicyFactory, ReconciliationPolicyFactory>();
 builder.Services.AddScoped<ReconciliationAppService>();
+builder.Services.AddScoped<IConciliationService, ConciliationService>();
 
 var app = builder.Build();
 

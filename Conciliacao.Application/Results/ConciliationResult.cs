@@ -1,8 +1,9 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-
 namespace Conciliacao.Application.Results
 {
+    /// <summary>
+    /// Resultado de uma conciliação. Pode ser serializado em payload (Success:ProcessedCount)
+    /// para armazenar em ProcessedRequest e reconstruir em requisições duplicadas (idempotência).
+    /// </summary>
     public class ConciliationResult
     {
         public bool Success { get; }
@@ -17,18 +18,31 @@ namespace Conciliacao.Application.Results
         public static ConciliationResult SuccessResult(int count)
             => new(true, count);
 
-        public string ToHash()
+        /// <summary>
+        /// Serializa o resultado em string para persistir (ex.: "True:3").
+        /// Usado para reconstruir o resultado em FromPayload quando a requisição é duplicada.
+        /// </summary>
+        public string ToPayload()
         {
-            var raw = $"{Success}-{ProcessedCount}";
-            using var sha = SHA256.Create();
-            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(raw));
-            return Convert.ToBase64String(bytes);
+            return $"{Success}:{ProcessedCount}";
         }
 
-        public static ConciliationResult FromHash(string hash)
+        /// <summary>
+        /// Reconstrói o resultado a partir do payload salvo em ProcessedRequest.
+        /// Garante que a segunda requisição (mesma chave idempotente) retorna o mesmo resultado.
+        /// </summary>
+        public static ConciliationResult FromPayload(string payload)
         {
-            // simplificado para o exemplo
-            return new ConciliationResult(true, 0);
+            if (string.IsNullOrEmpty(payload))
+                return new ConciliationResult(true, 0);
+
+            var parts = payload.Split(':', 2, StringSplitOptions.None);
+            if (parts.Length != 2)
+                return new ConciliationResult(true, 0);
+
+            var success = parts[0].Equals("True", StringComparison.OrdinalIgnoreCase);
+            var count = int.TryParse(parts[1], out var n) ? n : 0;
+            return new ConciliationResult(success, count);
         }
     }
 }
