@@ -11,7 +11,7 @@ namespace Conciliacao.Domain.Entities
         //  Construtor protegido para o EF
         protected Transaction() { }
 
-        //  Construtor principal do domínio
+        //  Construtor principal do domÃ­nio
         public Transaction(
             string externalReference,
             string reference,
@@ -19,9 +19,11 @@ namespace Conciliacao.Domain.Entities
             DateTime date)
         {
             Id = Guid.NewGuid();
-            ExternalReference = externalReference
-                ?? throw new ArgumentNullException(nameof(externalReference));
 
+            if (string.IsNullOrWhiteSpace(externalReference))
+                throw new ArgumentNullException(nameof(externalReference));
+
+            ExternalReference = externalReference;
             Reference = reference ?? string.Empty;
             Amount = amount;
             Date = date;
