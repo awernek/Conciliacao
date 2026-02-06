@@ -1,8 +1,7 @@
 using Conciliacao.Api.Tests.Infrastructure;
 using Conciliacao.Domain.Repositories;
+using Conciliacao.Infra.Contexts;
 using Conciliacao.Infra.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
-using Conciliacao.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

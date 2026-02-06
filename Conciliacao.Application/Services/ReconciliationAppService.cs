@@ -6,11 +6,10 @@ using Conciliacao.Application.Models;
 using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Enums;
 using Conciliacao.Domain.Repositories;
-using Conciliacao.Infrastructure.Persistence.Repositories;
 
 namespace Conciliacao.Application.Services
 {
-    public class ReconciliationAppService
+    public class ReconciliationAppService : IReconciliationAppService
     {
         private readonly IReconciliationPolicyFactory _factory;
         private readonly ITransactionRepository _transactionRepository;

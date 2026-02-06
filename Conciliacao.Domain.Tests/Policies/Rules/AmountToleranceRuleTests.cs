@@ -16,7 +16,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var transaction = new Transaction("", "", 100.00m, default);
-            var externalEntry = new ExternalEntry { Amount = 99.98m };
+            var externalEntry = new ExternalEntry("", 99.98m, default);
             var rule = new AmountToleranceRule(0.05m);
 
             // Agir
@@ -34,7 +34,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var transaction = new Transaction("", "", 100.00m, default);
-            var externalEntry = new ExternalEntry { Amount = 99.95m };
+            var externalEntry = new ExternalEntry("", 99.95m, default);
             var rule = new AmountToleranceRule(0.05m);
 
             // Agir
@@ -52,7 +52,7 @@ namespace Conciliacao.Domain.Tests.Policies.Rules
         {
             // Preparar
             var transaction = new Transaction("", "", 100.00m, default);
-            var externalEntry = new ExternalEntry { Amount = 99.90m };
+            var externalEntry = new ExternalEntry("", 99.90m, default);
             var rule = new AmountToleranceRule(0.05m);
 
             // Agir

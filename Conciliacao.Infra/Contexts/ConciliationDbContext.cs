@@ -2,7 +2,7 @@ using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
-namespace Conciliacao.Infrastructure.Persistence.Contexts
+namespace Conciliacao.Infra.Contexts
 {
     public class ConciliationDbContext
         : DbContext,
@@ -25,31 +25,6 @@ namespace Conciliacao.Infrastructure.Persistence.Contexts
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
-
-            modelBuilder.Entity<Conciliation>(entity =>
-            {
-                entity.HasKey(x => x.Id);
-
-                entity.Property(x => x.ExternalReference)
-                      .IsRequired()
-                      .HasMaxLength(100);
-
-                entity.Property(x => x.Amount)
-                      .HasPrecision(18, 2);
-
-                entity.HasIndex(x => x.ExternalReference)
-                      .IsUnique();
-            });
-
-            modelBuilder.Entity<ProcessedRequest>(entity =>
-            {
-                entity.Property(e => e.IdempotencyKey)
-                    .IsRequired()
-                    .HasMaxLength(200);
-
-                entity.HasIndex(e => e.IdempotencyKey)
-                    .IsUnique();
-            });
         }
     }
 }

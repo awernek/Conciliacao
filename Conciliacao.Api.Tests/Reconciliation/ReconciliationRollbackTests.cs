@@ -1,6 +1,6 @@
 using Conciliacao.Api.Tests.Fixtures;
 using Conciliacao.Application.DTOs.Reconciliation;
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infra.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;

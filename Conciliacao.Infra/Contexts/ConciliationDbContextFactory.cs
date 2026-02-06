@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 
-namespace Conciliacao.Infrastructure.Persistence.Contexts
+namespace Conciliacao.Infra.Contexts
 {
     /// <summary>
     /// Fábrica de design-time para o EF Core criar o <see cref="ConciliationDbContext"/>.

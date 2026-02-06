@@ -27,18 +27,8 @@ namespace Conciliacao.Domain.Tests
 
             var externalEntries = new[]
             {
-                new ExternalEntry
-                {
-                    Reference = "T1",
-                    Amount = 100m,
-                    Date = new DateTime(2025, 1, 10)
-                },
-                new ExternalEntry
-                {
-                    Reference = "T2",
-                    Amount = 50m,
-                    Date = new DateTime(2025, 1, 10)
-                }
+                new ExternalEntry("T1", 100m, new DateTime(2025, 1, 10)),
+                new ExternalEntry("T2", 50m, new DateTime(2025, 1, 10))
             };
 
             // Agir

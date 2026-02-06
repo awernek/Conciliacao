@@ -1,9 +1,9 @@
 ﻿using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infra.Contexts;
 using Microsoft.EntityFrameworkCore;
 
-namespace Conciliacao.Infrastructure.Persistence.Repositories
+namespace Conciliacao.Infra.Repositories
 {
     public class TransactionRepository : ITransactionRepository
     {
@@ -14,9 +14,10 @@ namespace Conciliacao.Infrastructure.Persistence.Repositories
             _context = context;
         }
 
-        public async Task AddAsync(Transaction transaction)
+        public Task AddAsync(Transaction transaction)
         {
             _context.Transactions.Add(transaction);
+            return Task.CompletedTask;
         }
 
         public async Task AddRangeAsync(IEnumerable<Transaction> transactions)

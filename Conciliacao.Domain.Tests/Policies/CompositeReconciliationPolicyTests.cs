@@ -23,7 +23,7 @@ namespace Conciliacao.Domain.Tests.Policies
             };
             var policy = new CompositeReconciliationPolicy(rules);
             var transaction = new Transaction("", "", 0, default);
-            var external = new ExternalEntry();
+            var external = new ExternalEntry("", 0, default);
 
             // Agir
             var result = policy.IsMatch(transaction, external);
@@ -47,7 +47,7 @@ namespace Conciliacao.Domain.Tests.Policies
             };
             var policy = new CompositeReconciliationPolicy(rules);
             var transaction = new Transaction("", "", 0, default);
-            var external = new ExternalEntry();
+            var external = new ExternalEntry("", 0, default);
 
             // Agir
             var result = policy.IsMatch(transaction, external);

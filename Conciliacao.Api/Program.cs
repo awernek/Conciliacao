@@ -1,9 +1,8 @@
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Services;
 using Conciliacao.Domain.Repositories;
+using Conciliacao.Infra.Contexts;
 using Conciliacao.Infra.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
-using Conciliacao.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,7 +29,7 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 // Application
 builder.Services.AddScoped<IReconciliationPolicyFactory, ReconciliationPolicyFactory>();
-builder.Services.AddScoped<ReconciliationAppService>();
+builder.Services.AddScoped<IReconciliationAppService, ReconciliationAppService>();
 builder.Services.AddScoped<IConciliationService, ConciliationService>();
 
 var app = builder.Build();

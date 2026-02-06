@@ -1,9 +1,9 @@
 using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infra.Contexts;
 using Microsoft.EntityFrameworkCore;
 
-namespace Conciliacao.Infrastructure.Persistence.Repositories
+namespace Conciliacao.Infra.Repositories
 {
     public class ProcessedRequestRepository : IProcessedRequestRepository
     {

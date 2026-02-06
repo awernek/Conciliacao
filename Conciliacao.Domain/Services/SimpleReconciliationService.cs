@@ -20,27 +20,37 @@ namespace Conciliacao.Domain.Services
             var results = new List<ReconciliationItem>();
             var matchedExternalEntries = new HashSet<ExternalEntry>();
 
+            var externalByReference = externalEntries
+                .GroupBy(e => e.Reference)
+                .ToDictionary(g => g.Key, g => g.First());
+
             foreach (var transaction in transactions)
             {
-                var match = externalEntries
-                    .FirstOrDefault(e => _policy.IsMatch(transaction, e));
-
-                if (match != null)
-                {
-                    results.Add(new ReconciliationItem(
-                        transaction,
-                        match,
-                        ReconciliationResult.Matched));
-
-                    matchedExternalEntries.Add(match);
-                }
-                else
+                if (!externalByReference.TryGetValue(transaction.Reference, out var external))
                 {
                     results.Add(new ReconciliationItem(
                         transaction,
                         null,
                         ReconciliationResult.Missing));
+                    continue;
                 }
+
+                if (_policy.IsMatch(transaction, external))
+                {
+                    results.Add(new ReconciliationItem(
+                        transaction,
+                        external,
+                        ReconciliationResult.Matched));
+                }
+                else
+                {
+                    results.Add(new ReconciliationItem(
+                        transaction,
+                        external,
+                        ReconciliationResult.Divergent));
+                }
+
+                matchedExternalEntries.Add(external);
             }
 
             foreach (var external in externalEntries)

@@ -8,7 +8,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Conciliacao.Domain\Conciliacao.Domain.csproj" />
-    <ProjectReference Include="..\Conciliacao.Infra\Conciliacao.Infra.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
   </ItemGroup>
 
 </Project>

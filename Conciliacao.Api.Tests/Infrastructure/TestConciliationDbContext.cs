@@ -1,4 +1,4 @@
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infra.Contexts;
 using Microsoft.EntityFrameworkCore;
 
 namespace Conciliacao.Api.Tests.Infrastructure

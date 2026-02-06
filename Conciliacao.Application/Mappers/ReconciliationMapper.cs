@@ -9,12 +9,7 @@ namespace Conciliacao.Application.Mappers
             => new Transaction("", dto.Reference, dto.Amount, dto.Date);
 
         public static ExternalEntry ToEntity(ExternalEntryDto dto)
-            => new ExternalEntry
-            {
-                Reference = dto.Reference,
-                Amount = dto.Amount,
-                Date = dto.Date
-            };
+            => new ExternalEntry(dto.Reference, dto.Amount, dto.Date);
 
         public static TransactionDto ToDto(Transaction entity)
             => new TransactionDto

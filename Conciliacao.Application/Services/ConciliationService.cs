@@ -1,5 +1,6 @@
 using Conciliacao.Application.Requests;
 using Conciliacao.Application.Results;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,9 @@ namespace Conciliacao.Application.Services
         string idempotencyKey)
     {
         // 1️⃣ Constrói as entidades de domínio (somente memória)
-        var transactions = request.ToTransactions();
+        var transactions = request.Items
+            .Select(item => new Transaction("", item.Reference, item.Amount, DateTime.UtcNow))
+            .ToList();
 
         // 2️⃣ Calcula o resultado de forma determinística
         // IMPORTANTE: o mesmo input SEMPRE gera o mesmo hash

@@ -1,17 +1,20 @@
-﻿using Conciliacao.Domain.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Domain.Repositories;
+using Conciliacao.Infra.Contexts;
 
-public class UnitOfWork : IUnitOfWork
+namespace Conciliacao.Infra.Persistence
 {
-    private readonly ConciliationDbContext _context;
-
-    public UnitOfWork(ConciliationDbContext context)
+    public class UnitOfWork : IUnitOfWork
     {
-        _context = context;
-    }
+        private readonly ConciliationDbContext _context;
 
-    public async Task CommitAsync()
-    {
-        await _context.SaveChangesAsync();
+        public UnitOfWork(ConciliationDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task CommitAsync()
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 }

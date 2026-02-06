@@ -1,6 +1,7 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Policies;
 
-namespace Conciliacao.Domain.Policies
+namespace Conciliacao.Domain.Tests.Policies
 {
     public class FakeRule : IReconciliationRule
     {

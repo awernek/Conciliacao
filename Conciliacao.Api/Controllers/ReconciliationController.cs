@@ -7,11 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/[controller]")]
 public class ReconciliationController : ControllerBase
 {
-    private readonly ReconciliationAppService _appService;
+    private readonly IReconciliationAppService _appService;
+    private readonly ILogger<ReconciliationController> _logger;
 
-    public ReconciliationController(ReconciliationAppService appService)
+    public ReconciliationController(
+        IReconciliationAppService appService,
+        ILogger<ReconciliationController> logger)
     {
         _appService = appService;
+        _logger = logger;
     }
 
     [HttpPost("batch")]
@@ -25,8 +29,9 @@ public class ReconciliationController : ControllerBase
             var result = await _appService.ReconcileBatchAsync(client, request.Transactions, request.ExternalEntries);
             return Ok(result);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Erro ao processar conciliação em lote para clientCode={ClientCode}", clientCode);
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
     }

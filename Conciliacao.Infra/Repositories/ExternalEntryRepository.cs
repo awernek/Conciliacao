@@ -1,6 +1,6 @@
 ﻿using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Repositories;
-using Conciliacao.Infrastructure.Persistence.Contexts;
+using Conciliacao.Infra.Contexts;
 using Microsoft.EntityFrameworkCore;
 
 namespace Conciliacao.Infra.Repositories
@@ -14,9 +14,10 @@ namespace Conciliacao.Infra.Repositories
             _context = context;
         }
 
-        public async Task AddAsync(ExternalEntry externalEntry)
+        public Task AddAsync(ExternalEntry externalEntry)
         {
             _context.ExternalEntries.Add(externalEntry);
+            return Task.CompletedTask;
         }
 
         public async Task AddRangeAsync(IEnumerable<ExternalEntry> entries)

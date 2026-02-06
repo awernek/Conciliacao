@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Conciliacao.Infrastructure.Persistence.Configurations
+namespace Conciliacao.Infra.Configurations
 {
     public class ProcessedRequestConfiguration
         : IEntityTypeConfiguration<ProcessedRequest>

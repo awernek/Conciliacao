@@ -15,10 +15,14 @@ namespace Conciliacao.Api.Controllers
     {
         private const string IdempotencyKeyHeaderName = "Idempotency-Key";
         private readonly IConciliationService _conciliationService;
+        private readonly ILogger<ConciliationController> _logger;
 
-        public ConciliationController(IConciliationService conciliationService)
+        public ConciliationController(
+            IConciliationService conciliationService,
+            ILogger<ConciliationController> logger)
         {
             _conciliationService = conciliationService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -44,8 +48,9 @@ namespace Conciliacao.Api.Controllers
                 var result = await _conciliationService.ConciliateAsync(request, idempotencyKey.Trim());
                 return Ok(result);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Erro ao processar conciliação idempotente para key={IdempotencyKey}", idempotencyKey);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
         }
