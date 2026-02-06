@@ -11,6 +11,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 public class ConciliationServiceConcurrencyTests
 {
+    /// <summary>
+    /// Testa que, mesmo com chamadas concorrentes usando a mesma chave de idempotência, o serviço processa a requisição apenas uma vez e retorna o mesmo resultado para ambas.
+    /// Isso garante que a lógica de idempotência funciona corretamente sob condições de concorrência.
+    /// </summary>
     [Fact]
     public async Task Should_Process_Request_Only_Once_When_Called_Concurrently()
     {
@@ -79,6 +83,9 @@ public class ConciliationServiceConcurrencyTests
         }
     }
 
+    /// <summary>
+    /// Constrói o provedor de serviços para os testes, configurando dependências e contexto de banco de dados.
+    /// </summary>
     private static ServiceProvider BuildServiceProvider()
     {
         var connectionString = GetConnectionString();
@@ -98,6 +105,9 @@ public class ConciliationServiceConcurrencyTests
         return services.BuildServiceProvider();
     }
 
+    /// <summary>
+    /// Obtém a string de conexão para o banco de dados dos testes.
+    /// </summary>
     private static string GetConnectionString()
     {
         // 1) Variável de ambiente (CI, Docker, override local)
