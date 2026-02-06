@@ -41,7 +41,7 @@ O “coração” do negócio está no **Domain**; a orquestração e a integra�
 - **Domain**: entidades, value objects, políticas de conciliação e serviço de conciliação “puro”.
 - **Infra**: implementação dos repositórios e do banco.
 
-O fluxo da conciliação em lote que você usa hoje é: **API → ReconciliationAppService → InternalBatchReconciliationService + Policy**.
+A API expõe **dois fluxos** sob o recurso **Conciliação**: (1) **com idempotência** — POST /api/conciliation; (2) **em lote (sem idempotência)** — POST /api/conciliation/batch. O fluxo em lote é: **API → ConciliationBatchService → SimpleReconciliationService + Policy**.
 
 ---
 
@@ -98,7 +98,7 @@ Assim você pode combinar regras por cliente (ex.: CLIENT_A com tolerância 0,05
 - Gera `ReconciliationItem` para cada transação (Matched ou Missing) e para cada entrada externa não utilizada (Extra).
 - Retorna uma coleção de `ReconciliationItem`.
 
-Esse serviço **não** sabe de cliente, HTTP ou persistência; só de entidades e política. O fluxo em lote que a API usa hoje é o **InternalBatchReconciliationService** (Application), que usa a mesma ideia de política mas com outro formato de resultado e critério de “par” por referência.
+Esse serviço **não** sabe de cliente, HTTP ou persistência; só de entidades e política. O fluxo em lote que a API usa hoje é o **ConciliationBatchService** (Application), que usa a mesma ideia de política mas com outro formato de resultado e critério de “par” por referência.
 
 ---
 
@@ -106,20 +106,22 @@ Esse serviço **não** sabe de cliente, HTTP ou persistência; só de entidades 
 
 Aqui a aplicação coordena: entrada (DTOs), persistência (repositórios), criação da política (factory), execução da conciliação e saída (DTOs).
 
-### 4.1 ReconciliationAppService
+### 4.1 ConciliationBatchService
 
 É o **caso de uso** “conciliar em lote”:
 
 1. **Entrada**: `Client`, listas de `TransactionDto` e `ExternalEntryDto`.
-2. **Mapeia** DTO → entidade (`ReconciliationMapper.ToEntity`).
+2. **Mapeia** DTO → entidade (`ConciliationMapper.ToEntity`).
 3. **Persiste** transações e entradas externas (repositórios).
 4. **Obtém a política** do cliente: `_factory.CreateFor(client)` → `IReconciliationPolicy`.
-5. **Executa a conciliação**: cria `InternalBatchReconciliationService` com essa política e chama `Execute(transactions, externalEntries)`.
-6. **Mapeia** o resultado para `ReconciliationBatchResponseDto` (Missing, Extra, Matched, Divergent) e devolve.
+5. **Executa a conciliação**: cria `SimpleReconciliationService` (Domain) com essa política e chama `Reconcile(transactions, externalEntries)`.
+6. **Mapeia** o resultado para `ConciliationBatchResponseDto` (Missing, Extra, Matched, Divergent) e devolve.
 
 Ou seja: o App Service **não** implementa a lógica de “quando dois itens batem”; ele só coordena dados, persistência e chamada ao serviço que usa a política.
 
-### 4.2 InternalBatchReconciliationService
+### 4.2 SimpleReconciliationService (Domain)
+
+O ConciliationBatchService usa o **SimpleReconciliationService** do Domain:
 
 - Recebe: listas de `Transaction` e `ExternalEntry` (já entidades) e uma `IReconciliationPolicy`.
 - **Agrupa** entradas externas por `Reference` (um dicionário por referência).
@@ -129,16 +131,12 @@ Ou seja: o App Service **não** implementa a lógica de “quando dois itens bat
     - Se `_policy.IsMatch(transaction, external)` → **Matched**.
     - Senão → **Divergent**.
 - Entradas externas que nunca foram “usadas” por nenhuma transação → **Extra**.
-- Retorna um objeto **ReconciliationBatchResult** (listas: Matched, Divergent, Missing, Extra).
-
-Diferença em relação ao `SimpleReconciliationService` do Domain:
+- Retorna uma coleção de **ReconciliationItem** (cada um com Transaction, ExternalEntry e Result). O **ConciliationBatchService** converte em **ConciliationBatchResponseDto**.
 
 - O serviço de domínio procura “qualquer” entrada que dê match (e produz `ReconciliationItem`).
-- O InternalBatch usa **referência** como chave de emparelhamento e ainda separa **Matched** e **Divergent** (mesma referência, mas política não satisfeita).
+### 4.3 ConciliationPolicyFactory (Factory no Application)
 
-### 4.3 ReconciliationPolicyFactory (Factory no Application)
-
-- **Interface**: `IReconciliationPolicyFactory` → `CreateFor(Client)` retorna `IReconciliationPolicy`.
+- **Interface**: `IConciliationPolicyFactory` → `CreateFor(Client)` retorna `IReconciliationPolicy` (Domain).
 - **Implementação**: conforme `client.Code` monta um `CompositeReconciliationPolicy` com as regras desejadas:
   - **CLIENT_A**: Reference + Date + AmountTolerance(0,05).
   - **CLIENT_B**: Reference + Date + AmountTolerance(0).
@@ -147,15 +145,15 @@ Diferença em relação ao `SimpleReconciliationService` do Domain:
 
 A factory **conhece** o domínio (entidades, políticas, regras), mas a **decisão** de qual política usar é de configuração por cliente, por isso ficou na Application.
 
-### 4.4 ReconciliationMapper
+### 4.4 ConciliationMapper
 
-- Métodos estáticos: `ToEntity` e `ToDto` para `Transaction` e `ExternalEntry`.
+- Métodos estáticos: `ToEntity` e `ToDto` para `Transaction` e `ExternalEntry` (namespace `Application.DTOs.Conciliation`).
 - Mantém a API e a persistência falando em DTOs, e o domínio em entidades.
 
 ### 4.5 DTOs e modelo de resultado
 
-- **ReconciliationBatchResponseDto**: contém listas `Missing`, `Extra`, `Matched`, `Divergent` (Matched/Divergent como `MatchedPairDto` com `Transaction` e `ExternalEntry` em DTO).
-- **ReconciliationBatchResult** (modelo da Application): mesmo formato, mas com entidades; é o retorno do `InternalBatchReconciliationService`, que o App Service converte para o DTO de resposta.
+- **ConciliationBatchResponseDto**: contém listas `Missing`, `Extra`, `Matched`, `Divergent` (Matched/Divergent como `MatchedPairDto` com `Transaction` e `ExternalEntry` em DTO).
+- O **ConciliationBatchService** usa o `SimpleReconciliationService` (Domain), que retorna `ReconciliationItem`; o serviço de aplicação converte para `ConciliationBatchResponseDto`.
 
 ---
 
@@ -164,12 +162,12 @@ A factory **conhece** o domínio (entidades, políticas, regras), mas a **decis�
 Diagrama em sequência:
 
 ```
-Cliente HTTP                Controller              ReconciliationAppService           Factory              InternalBatchReconciliationService    Policy
+Cliente HTTP                ConciliationController    ConciliationBatchService        Factory              SimpleReconciliationService    Policy
       │                           │                              │                        │                              │                          │
-      │  POST /api/Reconciliation/batch?clientCode=CLIENT_A       │                        │                              │                          │
+      │  POST /api/conciliation/batch?clientCode=CLIENT_A        │                        │                              │                          │
       │  Body: { Transactions, ExternalEntries }                  │                        │                              │                          │
       │──────────────────────────>│                              │                        │                              │                          │
-      │                           │  ReconcileBatch(client, DTOs) │                        │                              │                          │
+      │                           │  ConciliateBatchAsync(client, DTOs)                    │                              │                          │
       │                           │─────────────────────────────>│                        │                              │                          │
       │                           │                              │  Map DTO → Entity       │                              │                          │
       │                           │                              │  Persist (repos)        │                              │                          │
@@ -177,16 +175,16 @@ Cliente HTTP                Controller              ReconciliationAppService    
       │                           │                              │───────────────────────>│                              │                          │
       │                           │                              │  IReconciliationPolicy │                              │                          │
       │                           │                              │<───────────────────────│                              │                          │
-      │                           │                              │  Execute(trans, ext)    │                              │                          │
+      │                           │                              │  Reconcile(trans, ext)  │                              │                          │
       │                           │                              │─────────────────────────────────────────────────────>│                          │
       │                           │                              │                        │  IsMatch(trans, ext)          │                          │
       │                           │                              │                        │─────────────────────────────────────────────────────>│
       │                           │                              │                        │  true/false                  │                          │
       │                           │                              │                        │<─────────────────────────────────────────────────────│
-      │                           │                              │  ReconciliationBatchResult (Matched, Divergent, Missing, Extra)                   │
+      │                           │                              │  ReconciliationItem[] (Matched, Divergent, Missing, Extra)                      │
       │                           │                              │<─────────────────────────────────────────────────────│                          │
       │                           │                              │  Map Result → DTO       │                              │                          │
-      │                           │  ReconciliationBatchResponseDto                       │                              │                          │
+      │                           │  ConciliationBatchResponseDto│                        │                              │                          │
       │                           │<─────────────────────────────│                        │                              │                          │
       │  200 + JSON response      │                              │                        │                              │                          │
       │<──────────────────────────│                              │                        │                              │                          │
@@ -194,13 +192,13 @@ Cliente HTTP                Controller              ReconciliationAppService    
 
 Resumo em passos:
 
-1. **Controller** recebe `clientCode` e body com `Transactions` e `ExternalEntries` (DTOs).
-2. **ReconciliationAppService.ReconcileBatchAsync**:
+1. **ConciliationController** recebe `clientCode` e body com `Transactions` e `ExternalEntries` (DTOs) em POST /api/conciliation/batch.
+2. **ConciliationBatchService.ConciliateBatchAsync**:
    - Converte DTOs em entidades e persiste.
-   - Pede à **Factory** a política do cliente.
-   - Instancia **InternalBatchReconciliationService** com essa política e chama **Execute**.
-   - Converte o **ReconciliationBatchResult** em **ReconciliationBatchResponseDto** e retorna.
-3. **InternalBatchReconciliationService** emparelha por referência e, para cada par, usa **IReconciliationPolicy.IsMatch** para classificar em Matched ou Divergent; monta Missing e Extra.
+   - Pede à **IConciliationPolicyFactory** a política do cliente.
+   - Instancia **SimpleReconciliationService** (Domain) com essa política e chama **Reconcile**.
+   - Converte os **ReconciliationItem** em **ConciliationBatchResponseDto** e retorna.
+3. **SimpleReconciliationService** emparelha por referência e, para cada par, usa **IReconciliationPolicy.IsMatch** para classificar em Matched ou Divergent; monta Missing e Extra.
 4. **Controller** devolve 200 e o DTO em JSON.
 
 ---
@@ -209,22 +207,22 @@ Resumo em passos:
 
 ```
                     ┌──────────────────┐
-                    │   Reconciliation │
-                    │    Controller    │
+                    │  Conciliation    │
+                    │   Controller     │
                     └────────┬─────────┘
                              │ usa
                              ▼
                     ┌──────────────────┐
-                    │ Reconciliation   │     ┌─────────────────────┐
-                    │   AppService     │────>│ IReconciliation     │
+                    │ Conciliation     │     ┌─────────────────────┐
+                    │ BatchService     │────>│ IConciliation       │
                     └────────┬─────────┘     │ PolicyFactory       │
                              │               └──────────┬──────────┘
          ┌───────────────────┼───────────────────┐      │
          │                   │                   │      │
          ▼                   ▼                   ▼      ▼
 ┌────────────────┐  ┌────────────────┐  ┌─────────────────────┐
-│ ITransaction   │  │ IExternalEntry  │  │ InternalBatch        │
-│ Repository     │  │ Repository      │  │ ReconciliationService│
+│ ITransaction   │  │ IExternalEntry  │  │ SimpleReconciliation │
+│ Repository     │  │ Repository      │  │ Service (Domain)     │
 └────────────────┘  └────────────────┘  └──────────┬────────────┘
          │                   │                    │
          │                   │                    │ usa
@@ -244,10 +242,10 @@ Resumo em passos:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-- A **API** depende só do App Service e dos DTOs.
-- O **App Service** depende das interfaces de repositório, da factory e do InternalBatchReconciliationService.
-- O **InternalBatchReconciliationService** depende apenas de `IReconciliationPolicy` e entidades (Domain).
-- A **Factory** monta políticas do Domain (Composite + Rules) a partir do `Client`.
+- A **API** depende dos serviços de aplicação (ConciliationBatchService, ConciliationService) e dos DTOs.
+- O **ConciliationBatchService** depende das interfaces de repositório, da factory e do SimpleReconciliationService (Domain).
+- O **SimpleReconciliationService** depende apenas de `IReconciliationPolicy` e entidades (Domain).
+- A **ConciliationPolicyFactory** monta políticas do Domain (Composite + Rules) a partir do `Client`.
 
 ---
 
@@ -262,8 +260,8 @@ Resumo em passos:
 | **Composite** | CompositeReconciliationPolicy: combina várias regras (todas devem ser satisfeitas). |
 | **Regras atômicas** | IReconciliationRule: ReferenceMatchRule, DateMatchRule, AmountToleranceRule. |
 | **Repositórios (interfaces no Domain)** | ITransactionRepository, IExternalEntryRepository; implementação na Infra. |
-| **Application Service** | ReconciliationAppService: um caso de uso (“conciliar em lote”), coordena repositórios, factory e serviço de lote. |
-| **Factory (Application)** | ReconciliationPolicyFactory: cria a política correta para cada cliente. |
+| **Application Service** | ConciliationBatchService: um caso de uso (“conciliar em lote”), coordena repositórios, factory e SimpleReconciliationService. |
+| **Factory (Application)** | ConciliationPolicyFactory: cria a política correta para cada cliente. |
 
 ---
 
@@ -273,7 +271,7 @@ Resumo em passos:
 - **Application**: “Recebo DTOs e código do cliente; persisto os dados, pego a política do cliente, executo a conciliação em lote com essa política e devolvo o resultado em DTOs.”
 - **API**: “Exponho o caso de uso de conciliação em lote via POST, repassando cliente e body para o App Service.”
 
-Se quiser, no próximo passo podemos aprofundar só nas políticas (como adicionar uma nova regra ou um novo cliente) ou só no fluxo do InternalBatchReconciliationService (passo a passo com um exemplo numérico).
+Se quiser, no próximo passo podemos aprofundar só nas políticas (como adicionar uma nova regra ou um novo cliente) ou só no fluxo do ConciliationBatchService (passo a passo com um exemplo numérico).
 
 ---
 
@@ -286,25 +284,25 @@ Se você usar GitHub, GitLab ou outra ferramenta que renderize Mermaid, os bloco
 ```mermaid
 sequenceDiagram
     participant C as Cliente HTTP
-    participant API as ReconciliationController
-    participant App as ReconciliationAppService
-    participant Fac as PolicyFactory
-    participant Batch as InternalBatchReconciliationService
+    participant API as ConciliationController
+    participant App as ConciliationBatchService
+    participant Fac as ConciliationPolicyFactory
+    participant Batch as SimpleReconciliationService
     participant Pol as IReconciliationPolicy
     participant Repo as Repositories
 
-    C->>API: POST /batch?clientCode=CLIENT_A + body
-    API->>App: ReconcileBatchAsync(client, transactions, externalEntries)
-    App->>App: DTO → Entity (Mapper)
+    C->>API: POST /api/conciliation/batch?clientCode=CLIENT_A + body
+    API->>App: ConciliateBatchAsync(client, transactions, externalEntries)
+    App->>App: DTO → Entity (ConciliationMapper)
     App->>Repo: AddAsync(transactions, externalEntries)
     App->>Fac: CreateFor(client)
     Fac-->>App: IReconciliationPolicy (Composite + Rules)
-    App->>Batch: Execute(transactions, externalEntries)
+    App->>Batch: Reconcile(transactions, externalEntries)
     Batch->>Pol: IsMatch(transaction, external) para cada par por Reference
     Pol-->>Batch: true/false
-    Batch-->>App: ReconciliationBatchResult (Matched, Divergent, Missing, Extra)
-    App->>App: Result → ReconciliationBatchResponseDto
-    App-->>API: ReconciliationBatchResponseDto
+    Batch-->>App: ReconciliationItem[] (Matched, Divergent, Missing, Extra)
+    App->>App: Result → ConciliationBatchResponseDto
+    App-->>API: ConciliationBatchResponseDto
     API-->>C: 200 OK + JSON
 ```
 
@@ -352,14 +350,14 @@ classDiagram
 ```mermaid
 flowchart TB
     subgraph API
-        Controller[ReconciliationController]
+        Controller[ConciliationController]
     end
 
     subgraph Application
-        AppService[ReconciliationAppService]
-        BatchService[InternalBatchReconciliationService]
-        Factory[ReconciliationPolicyFactory]
-        Mapper[ReconciliationMapper]
+        AppService[ConciliationBatchService]
+        BatchService[SimpleReconciliationService]
+        Factory[ConciliationPolicyFactory]
+        Mapper[ConciliationMapper]
     end
 
     subgraph Domain

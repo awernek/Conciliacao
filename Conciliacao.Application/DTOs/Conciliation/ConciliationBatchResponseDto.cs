@@ -1,12 +1,12 @@
-namespace Conciliacao.Application.DTOs.Reconciliation
+namespace Conciliacao.Application.DTOs.Conciliation
 {
     /// <summary>
-    /// DTO de resposta da conciliação em lote. Todas as listas são inicializadas no construtor.
+    /// DTO de resposta da conciliação em lote.
     /// Matched e Divergent usam <see cref="MatchedPairDto"/> para serialização JSON com nomes Transaction/ExternalEntry.
     /// </summary>
-    public class ReconciliationBatchResponseDto
+    public class ConciliationBatchResponseDto
     {
-        public ReconciliationBatchResponseDto()
+        public ConciliationBatchResponseDto()
         {
             Missing = new List<TransactionDto>();
             Extra = new List<ExternalEntryDto>();

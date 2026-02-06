@@ -1,19 +1,19 @@
 using Conciliacao.Api.Tests.Fixtures;
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using FluentAssertions;
 using System.Net;
 using System.Net.Http.Json;
 
-namespace Conciliacao.Api.Tests.Reconciliation
+namespace Conciliacao.Api.Tests.Conciliation
 {
     /// <summary>
-    /// Testes de integração do endpoint POST /api/reconciliation/batch (ReconciliationController).
+    /// Testes de integração do endpoint POST /api/conciliation/batch (fluxo sem idempotência).
     /// </summary>
-    public class ReconciliationControllerTests : IClassFixture<CustomWebApplicationFactory>
+    public class ConciliationBatchControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         private readonly HttpClient _client;
 
-        public ReconciliationControllerTests(CustomWebApplicationFactory factory)
+        public ConciliationBatchControllerTests(CustomWebApplicationFactory factory)
         {
             _client = factory.CreateClient();
         }
@@ -26,10 +26,10 @@ namespace Conciliacao.Api.Tests.Reconciliation
         private ExternalEntryDto CreateExternalEntryDto(string reference, decimal amount, DateTime date, string source = "SYSTEM")
             => new() { Reference = reference, Amount = amount, Date = date, Source = source };
 
-        private BatchReconciliationRequestDto CreateBatchRequest(
+        private ConciliationBatchRequestDto CreateBatchRequest(
             IEnumerable<TransactionDto> transactions,
             IEnumerable<ExternalEntryDto> externalEntries)
-            => new()
+            => new ConciliationBatchRequestDto
             {
                 Transactions = transactions.ToList(),
                 ExternalEntries = externalEntries.ToList()
@@ -38,7 +38,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
         #endregion
 
         /// <summary>
-        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "matched"
+        /// Garante que o POST /api/conciliation/batch retorna 200 e classifica como "matched"
         /// quando existe uma transação e uma entrada externa com mesma referência, valor e data.
         /// </summary>
         [Fact]
@@ -60,13 +60,13 @@ namespace Conciliacao.Api.Tests.Reconciliation
             var request = CreateBatchRequest(transactions, externalEntries);
 
             // Act
-            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+            var response = await _client.PostAsJsonAsync($"/api/conciliation/batch?clientCode={clientCode}", request);
 
             // Assert: status code
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             // Assert: conteúdo
-            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            var result = await response.Content.ReadFromJsonAsync<ConciliationBatchResponseDto>();
             result.Should().NotBeNull();
 
             // Matched
@@ -84,7 +84,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
         }
 
         /// <summary>
-        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "divergent"
+        /// Garante que o POST /api/conciliation/batch retorna 200 e classifica como "divergent"
         /// quando referência e data batem, mas o valor difere além da tolerância do cliente.
         /// </summary>
         [Fact]
@@ -95,23 +95,23 @@ namespace Conciliacao.Api.Tests.Reconciliation
 
             var transactions = new[]
             {
-        CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
-    };
+                CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
+            };
 
             var externalEntries = new[]
             {
-        CreateExternalEntryDto("TX1", 90m, new DateTime(2025, 1, 10)) // Difere do Amount
-    };
+                CreateExternalEntryDto("TX1", 90m, new DateTime(2025, 1, 10)) // Difere do Amount
+            };
 
             var request = CreateBatchRequest(transactions, externalEntries);
 
             // Act
-            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+            var response = await _client.PostAsJsonAsync($"/api/conciliation/batch?clientCode={clientCode}", request);
 
             // Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            var result = await response.Content.ReadFromJsonAsync<ConciliationBatchResponseDto>();
             result.Should().NotBeNull();
 
             result!.Divergent.Should().ContainSingle(pair =>
@@ -127,7 +127,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
         }
 
         /// <summary>
-        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "missing"
+        /// Garante que o POST /api/conciliation/batch retorna 200 e classifica como "missing"
         /// as transações que não possuem entrada externa correspondente.
         /// </summary>
         [Fact]
@@ -138,20 +138,20 @@ namespace Conciliacao.Api.Tests.Reconciliation
 
             var transactions = new[]
             {
-        CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
-    };
+                CreateTransactionDto("TX1", 100m, new DateTime(2025, 1, 10))
+            };
 
             var externalEntries = Array.Empty<ExternalEntryDto>(); // Nenhum externo
 
             var request = CreateBatchRequest(transactions, externalEntries);
 
             // Act
-            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+            var response = await _client.PostAsJsonAsync($"/api/conciliation/batch?clientCode={clientCode}", request);
 
             // Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            var result = await response.Content.ReadFromJsonAsync<ConciliationBatchResponseDto>();
             result.Should().NotBeNull();
 
             result!.Missing.Should().ContainSingle(t =>
@@ -164,7 +164,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
         }
 
         /// <summary>
-        /// Garante que o POST /api/reconciliation/batch retorna 200 e classifica como "extra"
+        /// Garante que o POST /api/conciliation/batch retorna 200 e classifica como "extra"
         /// as entradas externas que não possuem transação correspondente.
         /// </summary>
         [Fact]
@@ -176,18 +176,18 @@ namespace Conciliacao.Api.Tests.Reconciliation
             var transactions = Array.Empty<TransactionDto>(); // Nenhuma transação
             var externalEntries = new[]
             {
-        CreateExternalEntryDto("TX1", 100m, new DateTime(2025, 1, 10))
-    };
+                CreateExternalEntryDto("TX1", 100m, new DateTime(2025, 1, 10))
+            };
 
             var request = CreateBatchRequest(transactions, externalEntries);
 
             // Act
-            var response = await _client.PostAsJsonAsync($"/api/reconciliation/batch?clientCode={clientCode}", request);
+            var response = await _client.PostAsJsonAsync($"/api/conciliation/batch?clientCode={clientCode}", request);
 
             // Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var result = await response.Content.ReadFromJsonAsync<ReconciliationBatchResponseDto>();
+            var result = await response.Content.ReadFromJsonAsync<ConciliationBatchResponseDto>();
             result.Should().NotBeNull();
 
             result!.Extra.Should().ContainSingle(e =>
@@ -198,6 +198,5 @@ namespace Conciliacao.Api.Tests.Reconciliation
             result.Divergent.Should().BeEmpty();
             result.Missing.Should().BeEmpty();
         }
-
     }
 }

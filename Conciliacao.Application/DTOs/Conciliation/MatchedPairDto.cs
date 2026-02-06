@@ -1,4 +1,4 @@
-namespace Conciliacao.Application.DTOs.Reconciliation
+namespace Conciliacao.Application.DTOs.Conciliation
 {
     public class MatchedPairDto
     {

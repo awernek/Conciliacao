@@ -1,6 +1,32 @@
 @Conciliacao.Api_HostAddress = http://localhost:5080
 
-GET {{Conciliacao.Api_HostAddress}}/weatherforecast/
+# Conciliação — fluxo com idempotência (POST)
+# Envie o header Idempotency-Key; mesma chave = mesmo resultado sem reprocessar.
+POST {{Conciliacao.Api_HostAddress}}/api/conciliation
+Content-Type: application/json
+Idempotency-Key: {{$guid}}
 Accept: application/json
+
+{
+  "items": [
+    { "reference": "REF1", "amount": 100.00 },
+    { "reference": "REF2", "amount": 200.00 }
+  ]
+}
+
+###
+# Conciliação — fluxo em lote (sem idempotência)
+POST {{Conciliacao.Api_HostAddress}}/api/conciliation/batch?clientCode=CLIENT_A
+Content-Type: application/json
+Accept: application/json
+
+{
+  "transactions": [
+    { "reference": "TX1", "amount": 100.00, "date": "2025-01-10T00:00:00Z" }
+  ],
+  "externalEntries": [
+    { "reference": "TX1", "amount": 100.00, "date": "2025-01-10T00:00:00Z", "source": "BANK" }
+  ]
+}
 
 ###

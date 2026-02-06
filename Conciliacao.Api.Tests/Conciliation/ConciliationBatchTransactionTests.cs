@@ -1,23 +1,23 @@
 using Conciliacao.Api.Tests.Fixtures;
 using Conciliacao.Api.Tests.Infrastructure;
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 
-namespace Conciliacao.Api.Tests.Reconciliation
+namespace Conciliacao.Api.Tests.Conciliation
 {
     /// <summary>
     /// Testes que garantem o uso correto de transação/UnitOfWork (um commit por lote).
     /// </summary>
-    public class ReconciliationTransactionTests
+    public class ConciliationBatchTransactionTests
         : IClassFixture<CustomWebApplicationFactory>
     {
         private readonly HttpClient _client;
         private readonly CustomWebApplicationFactory _factory;
 
-        public ReconciliationTransactionTests(CustomWebApplicationFactory factory)
+        public ConciliationBatchTransactionTests(CustomWebApplicationFactory factory)
         {
             _factory = factory;
             _client = factory.CreateClient();
@@ -34,7 +34,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
             counter.Reset();
 
             // Arrange
-            var request = new BatchReconciliationRequestDto
+            var request = new ConciliationBatchRequestDto
             {
                 Transactions =
                 {
@@ -64,7 +64,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
 
             // Act
             var response = await _client.PostAsJsonAsync(
-                "/api/reconciliation/batch?clientCode=CLIENT_A",
+                "/api/conciliation/batch?clientCode=CLIENT_A",
                 request);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK);

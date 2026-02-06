@@ -95,7 +95,7 @@ graph TB
         DB["SQL Server<br/>(Transações,<br/>ExternalEntries,<br/>ProcessedRequests)"]
     end
 
-    User -->|HTTP<br/>POST /batch<br/>POST /conciliation| API
+    User -->|HTTP<br/>POST /api/conciliation<br/>POST /api/conciliation/batch| API
     API -->|Usa| AppLayer
     AppLayer -->|Orquestra| DomainLayer
     AppLayer -->|Persiste| DB
@@ -113,26 +113,26 @@ Visão dos dois caminhos principais da API em paralelo.
 
 ```mermaid
 graph TD
-    subgraph Batch["📦 Fluxo 1: Batch Reconciliation"]
-        B1["POST /api/reconciliation/batch"]
-        B2["clientCode: CLIENT_A/B/C"]
-        B3["Persiste + Concilia + Commit"]
-        B4["Response: Matched/Divergent<br/>Missing/Extra"]
-    end
-
-    subgraph Idempotent["🔐 Fluxo 2: Idempotent Conciliation"]
+    subgraph Idempotent["🔐 Fluxo 1: Conciliação com idempotência"]
         I1["POST /api/conciliation"]
         I2["Header: Idempotency-Key"]
         I3["Garante 1 execução"]
         I4["Response: Success + Count"]
     end
 
+    subgraph Batch["📦 Fluxo 2: Conciliação em lote (sem idempotência)"]
+        B1["POST /api/conciliation/batch"]
+        B2["clientCode: CLIENT_A/B/C"]
+        B3["Persiste + Concilia + Commit"]
+        B4["Response: Matched/Divergent<br/>Missing/Extra"]
+    end
+
     subgraph Database["💾 Resultado"]
         DB["Dados persistidos<br/>atomicamente"]
     end
 
-    B1 --> B2 --> B3 --> B4 --> DB
     I1 --> I2 --> I3 --> I4 --> DB
+    B1 --> B2 --> B3 --> B4 --> DB
 
     style Batch fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     style Idempotent fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
@@ -149,17 +149,16 @@ Mostra como o projeto está organizado em 4 camadas (Clean Architecture).
 flowchart TB
     subgraph API["🌐 API (Conciliacao.Api)"]
         direction LR
-        RC["ReconciliationController<br/>Batch"]
-        CC["ConciliationController<br/>Idempotent"]
+        CC["ConciliationController<br/>POST /api/conciliation e /api/conciliation/batch"]
     end
 
     subgraph APP["Application (Conciliacao.Application)"]
         direction LR
-        RAS["ReconciliationAppService"]
+        CBS["ConciliationBatchService"]
         CS["ConciliationService"]
-        IBRS["InternalBatch<br/>ReconciliationService"]
-        FAC["PolicyFactory"]
-        MAP["ReconciliationMapper"]
+        SRS["SimpleReconciliation<br/>Service (Domain)"]
+        FAC["ConciliationPolicyFactory"]
+        MAP["ConciliationMapper"]
     end
 
     subgraph DOM["Domain (Conciliacao.Domain)"]
@@ -180,17 +179,17 @@ flowchart TB
         DB[("SQL Server")]
     end
 
-    RC --> RAS
+    CC --> CBS
     CC --> CS
-    RAS --> MAP
-    RAS --> FAC
-    RAS --> IBRS
-    RAS --> TXR
-    RAS --> EXR
+    CBS --> MAP
+    CBS --> FAC
+    CBS --> SRS
+    CBS --> TXR
+    CBS --> EXR
     CS --> TXR
     CS --> PRR
     FAC --> POL
-    IBRS --> POL
+    SRS --> POL
     POL --> RUL
     RUL --> MON
     CTX --> DB
@@ -203,26 +202,26 @@ flowchart TB
 
 ## Diagrama 6 — Fluxo Batch (Da requisição à resposta)
 
-Mostra passo a passo o que acontece quando alguém chama `POST /api/reconciliation/batch?clientCode=CLIENT_A`.
+Mostra passo a passo o que acontece quando alguém chama `POST /api/conciliation/batch?clientCode=CLIENT_A`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as Usuario
-    participant C as ReconciliationController
-    participant A as ReconciliationAppService
-    participant M as ReconciliationMapper
+    participant C as ConciliationController
+    participant A as ConciliationBatchService
+    participant M as ConciliationMapper
     participant R as Repositorios
-    participant F as PolicyFactory
-    participant B as InternalBatchReconciliationService
+    participant F as ConciliationPolicyFactory
+    participant B as SimpleReconciliationService
     participant P as IReconciliationPolicy
     participant UW as UnitOfWork
 
-    U->>C: POST /api/reconciliation/batch?clientCode=CLIENT_A
+    U->>C: POST /api/conciliation/batch?clientCode=CLIENT_A
     Note right of U: Body: transactions + externalEntries
 
     C->>C: Cria objeto Client com clientCode
-    C->>A: ReconcileBatchAsync(client, transactionDTOs, externalEntryDTOs)
+    C->>A: ConciliateBatchAsync(client, transactionDTOs, externalEntryDTOs)
 
     rect rgb(230, 245, 255)
         Note over A,M: Etapa 1 - Mapeamento
@@ -243,7 +242,7 @@ sequenceDiagram
         Note over A,P: Etapa 3 - Conciliacao
         A->>F: CreateFor(client)
         F-->>A: CompositeReconciliationPolicy com regras do cliente
-        A->>B: Execute(transactions, externalEntries)
+        A->>B: Reconcile(transactions, externalEntries)
 
         loop Para cada Transaction
             B->>B: Busca ExternalEntry com mesma Reference
@@ -259,7 +258,7 @@ sequenceDiagram
             end
         end
         B->>B: ExternalEntries sem par = EXTRA
-        B-->>A: ReconciliationBatchResult
+        B-->>A: ReconciliationItem[] (Matched, Divergent, Missing, Extra)
     end
 
     rect rgb(255, 230, 255)
@@ -269,7 +268,7 @@ sequenceDiagram
         Note right of UW: Agora sim grava tudo no banco!
     end
 
-    A-->>C: ReconciliationBatchResponseDto
+    A-->>C: ConciliationBatchResponseDto
     C-->>U: 200 OK + JSON com Matched, Divergent, Missing, Extra
 ```
 
@@ -367,7 +366,7 @@ classDiagram
         +Equals(Money other, decimal tolerance) bool
     }
 
-    class ReconciliationPolicyFactory {
+    class ConciliationPolicyFactory {
         +CreateFor(Client) IReconciliationPolicy
     }
 
@@ -382,8 +381,8 @@ classDiagram
     IReconciliationRule <|.. DateMatchRule : implementa
     IReconciliationRule <|.. AmountToleranceRule : implementa
     AmountToleranceRule --> Money : usa
-    ReconciliationPolicyFactory --> Client : recebe
-    ReconciliationPolicyFactory --> CompositeReconciliationPolicy : cria
+    ConciliationPolicyFactory --> Client : recebe
+    ConciliationPolicyFactory --> CompositeReconciliationPolicy : cria
 ```
 
 ---

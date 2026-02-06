@@ -92,15 +92,14 @@ O projeto segue **Clean Architecture** (Arquitetura Limpa) com 4 camadas. Cada c
 ```mermaid
 flowchart TB
     subgraph API["🌐 API"]
-        RC["ReconciliationController"]
         CC["ConciliationController"]
     end
 
     subgraph APP["⚙️ Application"]
-        RAS["ReconciliationAppService"]
+        CBS["ConciliationBatchService"]
         CS["ConciliationService"]
-        IBRS["InternalBatchReconciliationService"]
-        FAC["PolicyFactory"]
+        SRS["SimpleReconciliationService"]
+        FAC["ConciliationPolicyFactory"]
     end
 
     subgraph DOM["💎 Domain"]
@@ -114,32 +113,32 @@ flowchart TB
         DB[("SQL Server")]
     end
 
-    RC --> RAS
+    CC --> CBS
     CC --> CS
-    RAS --> IBRS
-    RAS --> FAC
+    CBS --> SRS
+    CBS --> FAC
     FAC --> POL
-    IBRS --> POL
+    SRS --> POL
     POL --> MON
-    RAS --> CTX
+    CBS --> CTX
     CS --> CTX
     CTX --> DB
 ```
 
 ---
 
-## 5. Os dois fluxos da API
+## 5. Os dois fluxos da API (Conciliação)
 
-O sistema expõe **dois endpoints** (duas "portas de entrada"):
+O sistema expõe **dois fluxos** sob o recurso **Conciliação** (um controller, duas rotas):
 
 | Endpoint | Para que serve | Quando usar |
-|----------|---------------|-------------|
-| `POST /api/reconciliation/batch` | Conciliação em **lote** (persistência + matching) | Enviar batch de transações + entradas externas para classificar |
-| `POST /api/conciliation` | Conciliação **idempotente** (com chave de segurança) | Garantir que a mesma operação nunca seja processada duas vezes |
+|----------|----------------|-------------|
+| `POST /api/conciliation` | Conciliação **com idempotência** (header Idempotency-Key obrigatório) | Garantir que a mesma operação nunca seja processada duas vezes |
+| `POST /api/conciliation/batch` | Conciliação **em lote** (sem idempotência; persistência + matching) | Enviar batch de transações + entradas externas para classificar (Matched, Divergent, Missing, Extra) |
 
 ### Diferença principal
-- **Batch**: foco em **classificar** (Matched, Divergent, Missing, Extra).
-- **Idempotente**: foco em **segurança** (nunca duplicar uma operação, mesmo com falhas de rede).
+- **Com idempotência**: foco em **segurança** (nunca duplicar uma operação, mesmo com falhas de rede).
+- **Em lote (batch)**: foco em **classificar** (Matched, Divergent, Missing, Extra) e persistir em um único commit.
 
 ---
 
@@ -155,7 +154,7 @@ Vamos detalhar cada passo:
 
 ### Passo 1 — Requisição chega
 ```http
-POST /api/reconciliation/batch?clientCode=CLIENT_A
+POST /api/conciliation/batch?clientCode=CLIENT_A
 Content-Type: application/json
 
 {
@@ -171,20 +170,20 @@ Content-Type: application/json
 ```
 
 ### Passo 2 — Controller recebe e repassa
-O `ReconciliationController` cria um objeto `Client` com o código enviado na query string e chama o `ReconciliationAppService`.
+O `ConciliationController` (ação **PostBatch**) cria um objeto `Client` com o código enviado na query string e chama o `ConciliationBatchService`.
 
 ### Passo 3 — AppService orquestra
-O `ReconciliationAppService` é o "maestro" — ele coordena tudo:
+O `ConciliationBatchService` é o "maestro" — ele coordena tudo:
 
-1. **Mapeia** DTOs → Entidades (usando `ReconciliationMapper`)
+1. **Mapeia** DTOs → Entidades (usando `ConciliationMapper`)
 2. **Persiste** em memória (repositórios fazem `AddRange`, mas sem gravar no banco ainda!)
-3. **Busca a política** do cliente via `PolicyFactory`
-4. **Executa** a conciliação usando `InternalBatchReconciliationService`
-5. **Mapeia** o resultado para DTO de resposta
+3. **Busca a política** do cliente via `IConciliationPolicyFactory`
+4. **Executa** a conciliação usando `SimpleReconciliationService` (Domain)
+5. **Mapeia** o resultado para `ConciliationBatchResponseDto`
 6. **Commit!** — só agora grava tudo no banco de uma vez
 
 ### Passo 4 — Motor de matching
-O `InternalBatchReconciliationService` faz o matching:
+O `SimpleReconciliationService` (Domain) faz o matching:
 
 ```
 Para cada Transaction:
@@ -228,13 +227,13 @@ sequenceDiagram
     participant P as Política
     participant UW as UnitOfWork
 
-    U->>C: POST /batch?clientCode=CLIENT_A
-    C->>A: ReconcileBatchAsync(client, DTOs)
+    U->>C: POST /api/conciliation/batch?clientCode=CLIENT_A
+    C->>A: ConciliateBatchAsync(client, DTOs)
     A->>A: Mapeia DTOs → Entidades
     A->>A: Persiste em memória (repositórios)
     A->>F: CreateFor(CLIENT_A)
     F-->>A: CompositePolicy com 3 regras
-    A->>B: Execute(transactions, externals)
+    A->>B: Reconcile(transactions, externals)
     loop Para cada Transaction
         B->>P: IsMatch(tx, ext)?
         P-->>B: true/false
@@ -519,10 +518,10 @@ public class FakeTransactionRepository : ITransactionRepository
 |--------|-------------|----------------|
 | **Strategy** | `IReconciliationPolicy` | Trocar a lógica de matching sem mudar o código que usa |
 | **Composite** | `CompositeReconciliationPolicy` | Combinar várias regras pequenas em uma política completa |
-| **Factory** | `ReconciliationPolicyFactory` | Criar a política certa para cada cliente |
-| **Unit of Work** | `ConciliationDbContext` (como `IUnitOfWork`) | Garantir commit atômico (tudo ou nada) |
+| **Factory** | `ConciliationPolicyFactory` | Criar a política certa para cada cliente |
+| **Unit of Work** | `UnitOfWork` (implementa `IUnitOfWork`) | Garantir commit atômico (tudo ou nada) |
 | **Repository** | `ITransactionRepository`, etc. | Abstrair o acesso ao banco de dados |
-| **Mapper** | `ReconciliationMapper` | Converter entre DTOs (API) e entidades (domínio) |
+| **Mapper** | `ConciliationMapper` | Converter entre DTOs (API) e entidades (domínio) no fluxo batch |
 | **Domain Service** | `SimpleReconciliationService` | Lógica de negócio que não pertence a uma entidade específica |
 | **Value Object** | `Money` | Comparação de valores com semântica de negócio (tolerância) |
 
@@ -535,18 +534,17 @@ Conciliacao/
 │
 ├── Conciliacao.Api/               ← 🌐 Camada de apresentação
 │   ├── Controllers/
-│   │   ├── ReconciliationController.cs   ← Endpoint batch
-│   │   └── ConciliationController.cs     ← Endpoint idempotente
+│   │   └── ConciliationController.cs     ← POST /api/conciliation (idempotente) e POST /api/conciliation/batch (lote)
 │   └── Program.cs                        ← Configuração e injeção de dependência
 │
 ├── Conciliacao.Application/       ← ⚙️ Camada de aplicação
 │   ├── Services/
-│   │   ├── ReconciliationAppService.cs   ← Caso de uso: conciliar em lote
-│   │   ├── InternalBatchReconciliationService.cs  ← Motor de matching
-│   │   └── ConciliationService.cs        ← Fluxo idempotente
-│   ├── Factories/                        ← Fábrica de políticas por cliente
-│   ├── Mappers/                          ← DTO ↔ Entidade
-│   ├── DTOs/                             ← Objetos de entrada/saída da API
+│   │   ├── ConciliationBatchService.cs   ← Caso de uso: conciliar em lote (sem idempotência)
+│   │   ├── InternalBatchReconciliationService.cs  ← (opcional) Motor de matching alternativo
+│   │   └── ConciliationService.cs        ← Fluxo com idempotência
+│   ├── Factories/                        ← IConciliationPolicyFactory, ConciliationPolicyFactory
+│   ├── Mappers/                          ← ConciliationMapper (DTO ↔ Entidade, fluxo batch)
+│   ├── DTOs/Conciliation/                ← ConciliationBatchRequestDto, ConciliationBatchResponseDto, etc.
 │   ├── Requests/                         ← Modelo de requisição (Conciliation)
 │   └── Results/                          ← Modelo de resultado (ConciliationResult)
 │

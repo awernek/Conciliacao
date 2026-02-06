@@ -1,12 +1,9 @@
 using Conciliacao.Domain.Entities;
-using Conciliacao.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Conciliacao.Infra.Contexts
 {
-    public class ConciliationDbContext
-        : DbContext,
-        IUnitOfWork
+    public class ConciliationDbContext : DbContext
     {
         public ConciliationDbContext(DbContextOptions<ConciliationDbContext> options)
             : base(options)
@@ -16,11 +13,6 @@ namespace Conciliacao.Infra.Contexts
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<ExternalEntry> ExternalEntries { get; set; }
         public DbSet<ProcessedRequest> ProcessedRequests { get; set; } = null!;
-
-        public async Task CommitAsync()
-        {
-            await SaveChangesAsync();
-        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

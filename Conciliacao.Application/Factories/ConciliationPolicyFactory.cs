@@ -1,9 +1,9 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Application.Factories
 {
-    public class ReconciliationPolicyFactory : IReconciliationPolicyFactory
+    public class ConciliationPolicyFactory : IConciliationPolicyFactory
     {
         public IReconciliationPolicy CreateFor(Client client)
         {

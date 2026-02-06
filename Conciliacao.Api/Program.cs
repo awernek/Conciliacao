@@ -2,6 +2,7 @@ using Conciliacao.Application.Factories;
 using Conciliacao.Application.Services;
 using Conciliacao.Domain.Repositories;
 using Conciliacao.Infra.Contexts;
+using Conciliacao.Infra.Persistence;
 using Conciliacao.Infra.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,13 +24,13 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
     builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
     builder.Services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
-    builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
+    builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<IProcessedRequestRepository, ProcessedRequestRepository>();
 }
 
 // Application
-builder.Services.AddScoped<IReconciliationPolicyFactory, ReconciliationPolicyFactory>();
-builder.Services.AddScoped<IReconciliationAppService, ReconciliationAppService>();
+builder.Services.AddScoped<IConciliationPolicyFactory, ConciliationPolicyFactory>();
+builder.Services.AddScoped<IConciliationBatchService, ConciliationBatchService>();
 builder.Services.AddScoped<IConciliationService, ConciliationService>();
 
 var app = builder.Build();

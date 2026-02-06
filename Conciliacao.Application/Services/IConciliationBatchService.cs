@@ -1,14 +1,14 @@
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Application.Services
 {
     /// <summary>
-    /// Contrato para o serviço de aplicação de conciliação em lote.
+    /// Serviço de aplicação para conciliação em lote (fluxo sem idempotência).
     /// </summary>
-    public interface IReconciliationAppService
+    public interface IConciliationBatchService
     {
-        Task<ReconciliationBatchResponseDto> ReconcileBatchAsync(
+        Task<ConciliationBatchResponseDto> ConciliateBatchAsync(
             Client client,
             IEnumerable<TransactionDto> transactionDtos,
             IEnumerable<ExternalEntryDto> externalEntryDtos);

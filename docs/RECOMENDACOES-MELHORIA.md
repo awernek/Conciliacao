@@ -20,7 +20,7 @@
 | 10 | 🟢 Baixa | `ReconciliationController` não usa interface | API |
 | 11 | 🟢 Baixa | `async` sem `await` nos repositórios | Infra |
 | 12 | 🟢 Baixa | `ProcessedRequest` sem namespace | Domain |
-| 13 | 🟢 Baixa | `UnitOfWork.cs` duplicado e não utilizado | Infra |
+| 13 | — | `UnitOfWork.cs` em uso (não remover) | Infra |
 | 14 | 🟢 Baixa | Configuração inline da entidade `Conciliation` | Infra |
 | 15 | 🟢 Baixa | Namespaces inconsistentes na Infra | Infra |
 
@@ -739,40 +739,24 @@ namespace Conciliacao.Domain.Entities
 
 ---
 
-### 13. `UnitOfWork.cs` duplicado e não utilizado
+### 13. `UnitOfWork.cs` — em uso (não remover)
 
-**Onde:** `Conciliacao.Infra/Persistence/UnitOfWork.cs`
+**Onde:** `Conciliacao.Infra/Persistence/UnitOfWork.cs` e `Program.cs`
 
-**Problema:**
+**Situação atual:**
 
-Existem **duas implementações** de `IUnitOfWork`:
-
-1. `ConciliationDbContext` (que implementa `IUnitOfWork` diretamente):
-```csharp
-public class ConciliationDbContext : DbContext, IUnitOfWork
-{
-    public async Task CommitAsync() => await SaveChangesAsync();
-}
-```
-
-2. `UnitOfWork.cs` (classe separada que delega para o mesmo DbContext):
-```csharp
-public class UnitOfWork : IUnitOfWork
-{
-    private readonly ConciliationDbContext _context;
-    public async Task CommitAsync() => await _context.SaveChangesAsync();
-}
-```
-
-No `Program.cs`, o **DbContext é registrado como `IUnitOfWork`**:
+O **UnitOfWork** é a implementação de `IUnitOfWork` registrada no DI e está **em uso**:
 
 ```csharp
-builder.Services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
+// Program.cs
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 ```
 
-O `UnitOfWork.cs` separado **nunca é registrado no DI** e provavelmente não é usado.
+A classe `UnitOfWork`:
+- Garante o **commit transacional único** (uma chamada a `SaveChangesAsync` por operação).
+- **Traduz exceções de infraestrutura** para o domínio: em `CommitAsync()`, captura `DbUpdateException` (violação de UNIQUE do SQL Server) e relança `DuplicateKeyException` do Domain, mantendo a Application livre de dependências de EF/SqlClient (DIP).
 
-**Como corrigir:** Remover `Conciliacao.Infra/Persistence/UnitOfWork.cs` (arquivo não utilizado).
+**Recomendação:** **Não remover** a classe `UnitOfWork`. Ela é essencial para transações e para o isolamento de dependências entre Application e Infra.
 
 ---
 

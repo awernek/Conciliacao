@@ -1,9 +1,12 @@
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Application.Mappers
 {
-    public static class ReconciliationMapper
+    /// <summary>
+    /// Mapeamento DTO ↔ entidade para o fluxo de conciliação em lote.
+    /// </summary>
+    public static class ConciliationMapper
     {
         public static Transaction ToEntity(TransactionDto dto)
             => new Transaction("", dto.Reference, dto.Amount, dto.Date);

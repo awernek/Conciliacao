@@ -18,7 +18,12 @@ namespace Conciliacao.Domain.Tests
         public void Reconcile_Should_Classify_Matched_Missing_And_Extra()
         {
             // Preparar
-            var policy = new DefaultReconciliationPolicy(0.05m);
+            var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
+            {
+                new ReferenceMatchRule(),
+                new DateMatchRule(),
+                new AmountToleranceRule(0.05m)
+            });
             var service = new SimpleReconciliationService(policy);
             var transactions = new[]
             {

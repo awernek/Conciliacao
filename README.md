@@ -23,14 +23,16 @@ Sistema de reconciliação automatizada de transações financeiras, construído
 
 ## 🎯 Visão Geral
 
-O Sistema de Conciliação Financeira automatiza a reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways, APIs). Oferece **dois fluxos de API**: conciliação em lote com persistência (Reconciliation) e conciliação idempotente (Conciliation).
+O Sistema de Conciliação Financeira automatiza a reconciliação entre transações internas (ERP/Core) e lançamentos externos (bancos, gateways, APIs). Oferece **dois fluxos de API** sob o recurso **Conciliação**:
+- **Com idempotência** — POST /api/conciliation (header Idempotency-Key obrigatório).
+- **Sem idempotência (lote)** — POST /api/conciliation/batch (persistência + matching por cliente).
 
 ### Principais Funcionalidades
 
-- ✅ **POST /api/reconciliation/batch** — Conciliação em lote: persiste transações e entradas externas, executa matching por política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um único commit** no final (rollback implícito em erro).
-- ✅ **POST /api/conciliation** — Conciliação **idempotente**: header `Idempotency-Key` obrigatório; requisições com a mesma chave retornam o resultado já salvo sem reprocessar (índice UNIQUE + tratamento de concorrência).
-- ✅ **Persistência** — Entity Framework Core, SQL Server; repositórios (Transaction, ExternalEntry, ProcessedRequest), Unit of Work (DbContext como IUnitOfWork).
-- ✅ **Política por cliente** — `IReconciliationPolicyFactory` cria a política conforme `clientCode` (CLIENT_A, CLIENT_B, CLIENT_C).
+- ✅ **POST /api/conciliation** — Conciliação **com idempotência**: header `Idempotency-Key` obrigatório; requisições com a mesma chave retornam o resultado já salvo sem reprocessar (índice UNIQUE + tratamento de concorrência).
+- ✅ **POST /api/conciliation/batch** — Conciliação **em lote (sem idempotência)**: persiste transações e entradas externas, executa matching por política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um único commit** no final (rollback implícito em erro).
+- ✅ **Persistência** — Entity Framework Core, SQL Server; repositórios (Transaction, ExternalEntry, ProcessedRequest), Unit of Work.
+- ✅ **Política por cliente** — `IConciliationPolicyFactory` cria a política conforme `clientCode` (CLIENT_A, CLIENT_B, CLIENT_C).
 - ✅ **Testes** — Unitários (Domain, Application, Rules) e testes de API (WebApplicationFactory), incluindo transação (um commit por batch), rollback e idempotência/concorrência.
 - ✅ **CI** — GitHub Actions (build + test no branch `master`).
 
@@ -59,14 +61,14 @@ O Sistema de Conciliação Financeira automatiza a reconciliação entre transa�
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  API (Controllers)                                                       │
-│  ReconciliationController  → POST /api/reconciliation/batch?clientCode=  │
-│  ConciliationController    → POST /api/conciliation (Idempotency-Key)   │
+│  ConciliationController    → POST /api/conciliation (idempotente)       │
+│                             → POST /api/conciliation/batch (lote)       │
 │  Swagger / OpenAPI                                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Application                                                             │
-│  ReconciliationAppService  → ReconcileBatchAsync (persiste + concilia + commit) │
-│  ConciliationService      → ConciliateAsync (idempotente, ProcessedRequest)   │
-│  InternalBatchReconciliationService, PolicyFactory, Mapper, DTOs/Requests/Results │
+│  ConciliationBatchService  → ConciliateBatchAsync (lote: persiste + concilia + commit) │
+│  ConciliationService       → ConciliateAsync (idempotente, ProcessedRequest)   │
+│  InternalBatchReconciliationService, ConciliationPolicyFactory, ConciliationMapper, DTOs/Conciliation │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Domain                                                                  │
 │  Entities: Transaction, ExternalEntry, Client, ReconciliationItem, ProcessedRequest │
@@ -86,11 +88,11 @@ O Sistema de Conciliação Financeira automatiza a reconciliação entre transa�
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| **POST** | `/api/reconciliation/batch?clientCode={clientCode}` | Persiste transações e entradas externas, concilia com a política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um commit** no final. |
+| **POST** | `/api/conciliation/batch?clientCode={clientCode}` | Conciliação em lote (sem idempotência): persiste transações e entradas externas, concilia com a política do cliente, retorna Matched/Divergent/Missing/Extra e faz **um commit** no final. |
 
 - **clientCode** (query, obrigatório): define a política (ex.: CLIENT_A, CLIENT_B, CLIENT_C).
-- **Body**: `BatchReconciliationRequestDto` — `transactions`, `externalEntries`; opcional `idempotencyKey`.
-- **Response**: `ReconciliationBatchResponseDto` (Matched, Divergent, Missing, Extra).
+- **Body**: `ConciliationBatchRequestDto` — `transactions`, `externalEntries`.
+- **Response**: `ConciliationBatchResponseDto` (Matched, Divergent, Missing, Extra).
 - Em erro: 500; o UoW não faz commit (rollback implícito).
 
 ### 2. Conciliação idempotente
@@ -108,11 +110,11 @@ O Sistema de Conciliação Financeira automatiza a reconciliação entre transa�
 
 | Componente | Descrição |
 |------------|-----------|
-| **ReconciliationAppService** | Recebe `Client` e listas de `TransactionDto`/`ExternalEntryDto`. Mapeia DTO→Entity, **persiste** (repositórios), obtém política via factory, executa **InternalBatchReconciliationService**, mapeia resultado para **ReconciliationBatchResponseDto**, chama **CommitAsync()** e retorna. Um único commit por request; em exceção, nada é gravado. |
-| **InternalBatchReconciliationService** | Recebe entidades e `IReconciliationPolicy`. Emparelha por Reference; classifica em Matched/Divergent/Missing/Extra. Retorna **ReconciliationBatchResult**. |
+| **ConciliationBatchService** | Recebe `Client` e listas de `TransactionDto`/`ExternalEntryDto`. Mapeia DTO→Entity, **persiste** (repositórios), obtém política via factory, executa **SimpleReconciliationService**, mapeia resultado para **ConciliationBatchResponseDto**, chama **CommitAsync()** e retorna. Um único commit por request; em exceção, nada é gravado. |
+| **InternalBatchReconciliationService** | (Domain/Application) Recebe entidades e `IReconciliationPolicy`. Emparelha por Reference; classifica em Matched/Divergent/Missing/Extra. |
 | **ConciliationService** | Fluxo idempotente: monta transações a partir de **ConciliationRequest**, persiste transações e **ProcessedRequest** (idempotencyKey + resultHash). Em violação de UNIQUE (concorrência), busca ProcessedRequest pela chave e retorna **ConciliationResult** a partir do payload salvo. |
-| **IReconciliationPolicyFactory** | Cria `IReconciliationPolicy` para um `Client` (CLIENT_A, CLIENT_B, CLIENT_C). |
-| **ReconciliationMapper** | ToEntity/ToDto para Transaction e ExternalEntry. |
+| **IConciliationPolicyFactory** | Cria `IReconciliationPolicy` para um `Client` (CLIENT_A, CLIENT_B, CLIENT_C). |
+| **ConciliationMapper** | ToEntity/ToDto para Transaction e ExternalEntry (fluxo batch). |
 
 ## 🗄️ Infraestrutura
 
@@ -124,7 +126,7 @@ O Sistema de Conciliação Financeira automatiza a reconciliação entre transa�
 
 ## 👤 Políticas por Cliente
 
-A **ReconciliationPolicyFactory** define políticas por código de cliente:
+A **ConciliationPolicyFactory** define políticas por código de cliente:
 
 | ClientCode | Regras | Tolerância (valor) |
 |------------|--------|---------------------|
@@ -136,7 +138,7 @@ A **ReconciliationPolicyFactory** define políticas por código de cliente:
 
 - **Idempotência**: fluxo `POST /api/conciliation` com header `Idempotency-Key`. ProcessedRequest armazena chave + hash do resultado; requisições repetidas retornam o resultado já persistido (FromPayload).
 - **Concorrência**: índice UNIQUE em `ProcessedRequests.IdempotencyKey`; duas requisições simultâneas com a mesma chave — uma insere, a outra recebe DbUpdateException (violação de UNIQUE), busca o ProcessedRequest pela chave e retorna o resultado já salvo.
-- **Consistência no batch**: ReconciliationAppService persiste primeiro, concilia e mapeia; **só no final** chama CommitAsync(). Se algo falhar antes, nada é gravado. Controller com try/catch retorna 500 sem commit.
+- **Consistência no batch**: ConciliationBatchService persiste primeiro, concilia e mapeia; **só no final** chama CommitAsync(). Se algo falhar antes, nada é gravado. Controller com try/catch retorna 500 sem commit.
 
 Detalhes: [docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md](docs/REVISAO-IDEMPOTENCIA-CONCORRENCIA-CONSISTENCIA.md).
 
@@ -148,8 +150,7 @@ Conciliacao/
 │   └── dotnet.yml                    # CI: build + test (master)
 ├── Conciliacao.Api/
 │   ├── Controllers/
-│   │   ├── ReconciliationController.cs   # POST /api/reconciliation/batch?clientCode=
-│   │   └── ConciliationController.cs     # POST /api/conciliation (Idempotency-Key)
+│   │   └── ConciliationController.cs     # POST /api/conciliation (idempotente) e POST /api/conciliation/batch (lote)
 │   └── Program.cs                    # Swagger, DI: repos, UoW, PolicyFactory, AppService, ConciliationService
 ├── Conciliacao.Api.Tests/
 │   ├── Fixtures/
@@ -158,19 +159,19 @@ Conciliacao/
 │   ├── Infrastructure/               # TestConciliationDbContext, FailingTransactionRepository, etc.
 │   ├── Integration/Idempotency/
 │   │   └── ConciliationConcurrencyTests.cs
-│   └── Reconciliation/
-│       ├── ReconciliationControllerTests.cs
-│       ├── ReconciliationTransactionTests.cs   # Um commit por batch
-│       └── ReconciliationRollbackTests.cs      # Rollback em erro
+│   └── Conciliation/
+│       ├── ConciliationBatchControllerTests.cs
+│       ├── ConciliationBatchTransactionTests.cs   # Um commit por batch
+│       └── ConciliationBatchRollbackTests.cs      # Rollback em erro
 ├── Conciliacao.Application/
-│   ├── DTOs/Reconciliation/           # BatchReconciliationRequestDto, ReconciliationBatchResponseDto, TransactionDto, etc.
+│   ├── DTOs/Conciliation/              # ConciliationBatchRequestDto, ConciliationBatchResponseDto, TransactionDto, etc.
 │   ├── Requests/                      # ConciliationRequest, ConciliationItem
 │   ├── Results/                       # ConciliationResult
-│   ├── Factories/                     # IReconciliationPolicyFactory, ReconciliationPolicyFactory
-│   ├── Mappers/                       # ReconciliationMapper
+│   ├── Factories/                     # IConciliationPolicyFactory, ConciliationPolicyFactory
+│   ├── Mappers/                       # ConciliationMapper
 │   ├── Models/                        # ReconciliationBatchResult
 │   └── Services/
-│       ├── ReconciliationAppService.cs
+│       ├── ConciliationBatchService.cs
 │       ├── InternalBatchReconciliationService.cs
 │       ├── ConciliationService.cs
 │       └── IConciliationService.cs
@@ -187,9 +188,9 @@ Conciliacao/
 │   ├── Configurations/               # EF configurations
 │   └── Migrations/
 ├── Conciliacao.Domain.Tests/
-│   ├── SimpleReconciliationServiceTests.cs, ReconciliationAppServiceTests.cs, ReconciliationAppServiceFlowTests.cs
+│   ├── SimpleReconciliationServiceTests.cs, ConciliationBatchServiceTests.cs, ConciliationBatchServiceFlowTests.cs
 │   ├── DefaultReconciliationPolicyTests.cs, CompositeReconciliationPolicyTests.cs, MoneyTests.cs
-│   ├── FakeReconciliationPolicyFactory.cs, FakeTransactionRepository.cs, FakeExternalEntryRepository.cs, FakeUnitOfWork.cs
+│   ├── FakeConciliationPolicyFactory.cs, FakeTransactionRepository.cs, FakeExternalEntryRepository.cs, FakeUnitOfWork.cs
 │   └── Policies/Rules/               # ReferenceMatchRuleTests, etc.
 └── docs/
     └── ARQUITETURA-E-FLUXO-CONCILIACAO.md   # Fluxo detalhado e diagramas
@@ -220,9 +221,9 @@ dotnet run --project Conciliacao.Api
 
 Acesse o Swagger (ex.: `https://localhost:5xxx/swagger`).
 
-### Exemplo: POST /api/reconciliation/batch
+### Exemplo: POST /api/conciliation/batch (lote)
 
-- **URL**: `POST /api/reconciliation/batch?clientCode=CLIENT_A`
+- **URL**: `POST /api/conciliation/batch?clientCode=CLIENT_A`
 - **Body**:
 ```json
 {
@@ -253,8 +254,8 @@ Acesse o Swagger (ex.: `https://localhost:5xxx/swagger`).
 
 | Decisão | Motivação |
 |---------|-----------|
-| **Dois fluxos de API** | Reconciliation batch: persistência + matching por cliente. Conciliation: idempotência e segurança em concorrência (ProcessedRequest + UNIQUE). |
-| **Um commit por batch** | ReconciliationAppService persiste tudo, concilia e mapeia; CommitAsync() só no final. Falha antes = nada gravado. |
+| **Dois fluxos de API (Conciliação)** | POST /api/conciliation = idempotência (Idempotency-Key). POST /api/conciliation/batch = lote com persistência + matching por cliente. |
+| **Um commit por batch** | ConciliationBatchService persiste tudo, concilia e mapeia; CommitAsync() só no final. Falha antes = nada gravado. |
 | **DbContext como IUnitOfWork** | Um único SaveChangesAsync por request; rollback implícito em exceção. |
 | **Política por cliente (Factory)** | Regras/tolerâncias diferentes por cliente sem alterar o fluxo. |
 | **InternalBatchReconciliationService** | Lógica de matching isolada; AppService orquestra persistência, factory e mapeamento. |

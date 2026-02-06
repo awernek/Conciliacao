@@ -1,23 +1,23 @@
 using Conciliacao.Api.Tests.Fixtures;
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using Conciliacao.Infra.Contexts;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 
-namespace Conciliacao.Api.Tests.Reconciliation
+namespace Conciliacao.Api.Tests.Conciliation
 {
     /// <summary>
     /// Testes que garantem o comportamento de rollback quando ocorre erro no processamento do lote.
     /// </summary>
-    public class ReconciliationRollbackTests
+    public class ConciliationBatchRollbackTests
         : IClassFixture<CustomWebApplicationFactory>
     {
         private readonly HttpClient _client;
         private readonly CustomWebApplicationFactory _factory;
 
-        public ReconciliationRollbackTests(CustomWebApplicationFactory factory)
+        public ConciliationBatchRollbackTests(CustomWebApplicationFactory factory)
         {
             _factory = factory;
             _client = factory.CreateClient();
@@ -31,7 +31,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
         public async Task Should_rollback_transaction_when_error_occurs()
         {
             // Arrange
-            var request = new BatchReconciliationRequestDto
+            var request = new ConciliationBatchRequestDto
             {
                 Transactions =
                 {
@@ -55,7 +55,7 @@ namespace Conciliacao.Api.Tests.Reconciliation
 
             // Act
             var response = await _client.PostAsJsonAsync(
-                "/api/reconciliation/batch?clientCode=CLIENT_A",
+                "/api/conciliation/batch?clientCode=CLIENT_A",
                 request);
 
             // Assert — API deve falhar

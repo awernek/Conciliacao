@@ -1,5 +1,4 @@
-using Conciliacao.Application.DTOs;
-using Conciliacao.Application.DTOs.Reconciliation;
+using Conciliacao.Application.DTOs.Conciliation;
 using Conciliacao.Application.Factories;
 using Conciliacao.Application.Services;
 using Conciliacao.Domain.Entities;
@@ -7,9 +6,9 @@ using Conciliacao.Domain.Entities;
 namespace Conciliacao.Domain.Tests
 {
     /// <summary>
-    /// Testes de fluxo do serviço de aplicação de conciliação com factory real.
+    /// Testes de fluxo do serviço de aplicação de conciliação em lote com factory real.
     /// </summary>
-    public class ReconciliationAppServiceFlowTests
+    public class ConciliationBatchServiceFlowTests
     {
         /// <summary>
         /// Garante que, para o cliente CLIENT_A, um lote com transações e entradas externas
@@ -17,16 +16,16 @@ namespace Conciliacao.Domain.Tests
         /// usando a política real com tolerância de valor.
         /// </summary>
         [Fact]
-        public async Task Should_Reconcile_Batch_Correctly_For_Client_A()
+        public async Task Should_Conciliate_Batch_Correctly_For_Client_A()
         {
             // Preparar
-            var factory = new ReconciliationPolicyFactory();
+            var factory = new ConciliationPolicyFactory();
             var transactionRepository = new FakeTransactionRepository();
             var externalEntryRepository = new FakeExternalEntryRepository();
             var unitOfWork = new FakeUnitOfWork();
-            var appService = new ReconciliationAppService(factory, transactionRepository, externalEntryRepository, unitOfWork);
+            var appService = new ConciliationBatchService(factory, transactionRepository, externalEntryRepository, unitOfWork);
 
-            var client = new Client { Code = "CLIENT_A" };
+            var client = new Client("CLIENT_A");
             var transactions = new List<TransactionDto>
             {
                 new TransactionDto
@@ -59,7 +58,7 @@ namespace Conciliacao.Domain.Tests
             };
 
             // Agir
-            var result = await appService.ReconcileBatchAsync(client, transactions, externalEntries);
+            var result = await appService.ConciliateBatchAsync(client, transactions, externalEntries);
 
             // Verificar
             Assert.Single(result.Matched);

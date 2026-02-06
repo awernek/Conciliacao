@@ -1,6 +1,7 @@
 using Conciliacao.Api.Tests.Infrastructure;
 using Conciliacao.Domain.Repositories;
 using Conciliacao.Infra.Contexts;
+using Conciliacao.Infra.Persistence;
 using Conciliacao.Infra.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -48,7 +49,8 @@ namespace Conciliacao.Api.Tests.Fixtures
                 services.AddScoped<ITransactionRepository>(sp =>
                     new ThrowingOnTxFailTransactionRepositoryDecorator(sp.GetRequiredService<TransactionRepository>()));
                 services.AddScoped<IExternalEntryRepository, ExternalEntryRepository>();
-                services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ConciliationDbContext>());
+                services.AddScoped<IProcessedRequestRepository, ProcessedRequestRepository>();
+                services.AddScoped<IUnitOfWork, UnitOfWork>();
             });
         }
     }
