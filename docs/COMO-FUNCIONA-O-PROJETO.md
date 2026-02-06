@@ -595,20 +595,33 @@ Conciliacao/
 
 ## 14. Diagramas
 
-Todos os diagramas detalhados do projeto estão no arquivo:
+Todos os diagramas do projeto estão no arquivo:
 
-📄 **[DIAGRAMAS-PROJETO.mermaid](DIAGRAMAS-PROJETO.mermaid)**
+📄 **[DIAGRAMAS-PROJETO.md](DIAGRAMAS-PROJETO.md)**
 
-Contém 8 diagramas:
+Contém **12 diagramas** organizados em dois níveis de abstração:
 
-1. **Visão geral das camadas** — como as 4 camadas se conectam
-2. **Fluxo batch completo** — passo a passo da conciliação em lote
-3. **Fluxo idempotente** — como funciona com `Idempotency-Key`
-4. **Políticas de conciliação** — diagrama de classes (Strategy + Composite)
-5. **Configuração por cliente** — quais regras cada cliente usa
-6. **Entidades do domínio** — atributos das entidades principais
-7. **Consistência: Unit of Work** — como o commit único garante atomicidade
-8. **Concorrência na idempotência** — duas requisições simultâneas
+### 📊 Diagramas de Alto Nível (Vision/System Design)
+
+Começam com uma visão geral do sistema e sua relação com o mundo externo:
+
+1. **Contexto Geral** — Quem está envolvido (bancos, gateways, ERP, usuários) e como interagem com a API
+2. **Fluxo de Dados de Alto Nível** — Como os dados fluem: entrada (transações + externo) → processamento (persistir, matching, classificar) → saída (resposta + DB)
+3. **Arquitetura de Containers** — Os 3 componentes principais: REST API, aplicação .NET, banco de dados SQL Server
+4. **Dois Fluxos Principais (lado a lado)** — Comparação visual entre fluxo batch e fluxo idempotente
+
+### 🔧 Diagramas Técnicos Detalhados
+
+Aprofundam em como funciona a implementação:
+
+5. **Visão geral das camadas** — como as 4 camadas (API, Application, Domain, Infrastructure) se conectam
+6. **Fluxo batch completo** — passo a passo da conciliação em lote (mapeamento → persistência → matching → classificação → commit)
+7. **Fluxo idempotente** — como funciona com `Idempotency-Key` e tratamento de requisições duplicadas
+8. **Políticas de conciliação** — diagrama de classes mostrando padrões Strategy + Composite
+9. **Configuração por cliente** — quais regras cada cliente (CLIENT_A, B, C) usa e qual tolerância de valor
+10. **Entidades do domínio** — atributos das entidades principais (Transaction, ExternalEntry, Client, etc.)
+11. **Consistência: Unit of Work** — como o commit único garante atomicidade (tudo ou nada)
+12. **Concorrência na idempotência** — duas requisições simultâneas com mesma chave de idempotência
 
 > **Dica**: copie qualquer bloco do arquivo `.mermaid` para o [Mermaid Live Editor](https://mermaid.live) para visualizar interativamente, ou veja diretamente no GitHub/GitLab que renderiza Mermaid automaticamente.
 
