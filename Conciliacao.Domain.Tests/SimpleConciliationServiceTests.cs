@@ -6,25 +6,25 @@ using Conciliacao.Domain.Services;
 namespace Conciliacao.Domain.Tests
 {
     /// <summary>
-    /// Testes do serviço de conciliação simples (SimpleReconciliationService).
+    /// Testes do serviço de conciliação simples (SimpleConciliationService).
     /// </summary>
-    public class SimpleReconciliationServiceTests
+    public class SimpleConciliationServiceTests
     {
         /// <summary>
         /// Garante que o serviço classifica corretamente: um par como Matched (T1),
         /// transações sem par como Missing e entradas externas sem par como Extra (T2).
         /// </summary>
         [Fact]
-        public void Reconcile_Should_Classify_Matched_Missing_And_Extra()
+        public void Conciliate_Should_Classify_Matched_Missing_And_Extra()
         {
             // Preparar
-            var policy = new CompositeReconciliationPolicy(new IReconciliationRule[]
+            var policy = new CompositeConciliationPolicy(new IConciliationRule[]
             {
                 new ReferenceMatchRule(),
                 new DateMatchRule(),
                 new AmountToleranceRule(0.05m)
             });
-            var service = new SimpleReconciliationService(policy);
+            var service = new SimpleConciliationService(policy);
             var transactions = new[]
             {
                 new Transaction("", "T1", 100m, new DateTime(2025, 1, 10))
@@ -37,11 +37,11 @@ namespace Conciliacao.Domain.Tests
             };
 
             // Agir
-            var result = service.Reconcile(transactions, externalEntries);
+            var result = service.Conciliate(transactions, externalEntries);
 
             // Verificar
-            Assert.Contains(result, r => r.Result == ReconciliationResult.Matched);
-            Assert.Contains(result, r => r.Result == ReconciliationResult.Extra);
+            Assert.Contains(result, r => r.Status == ConciliationStatus.Matched);
+            Assert.Contains(result, r => r.Status == ConciliationStatus.Extra);
         }
     }
 }

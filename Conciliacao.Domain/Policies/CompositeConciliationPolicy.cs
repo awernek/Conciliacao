@@ -1,12 +1,12 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Domain.Policies
 {
-    public class CompositeReconciliationPolicy : IReconciliationPolicy
+    public class CompositeConciliationPolicy : IConciliationPolicy
     {
-        private readonly IEnumerable<IReconciliationRule> _rules;
+        private readonly IEnumerable<IConciliationRule> _rules;
 
-        public CompositeReconciliationPolicy(IEnumerable<IReconciliationRule> rules)
+        public CompositeConciliationPolicy(IEnumerable<IConciliationRule> rules)
         {
             _rules = rules;
         }

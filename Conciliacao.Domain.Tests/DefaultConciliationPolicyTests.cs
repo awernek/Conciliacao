@@ -7,11 +7,11 @@ namespace Conciliacao.Domain.Tests
     /// Testes da política composta de conciliação com regras Reference + Date + AmountTolerance.
     /// Valida que a combinação das três regras se comporta corretamente.
     /// </summary>
-    public class DefaultReconciliationPolicyTests
+    public class DefaultConciliationPolicyTests
     {
-        private static IReconciliationPolicy CreatePolicy(decimal tolerance)
+        private static IConciliationPolicy CreatePolicy(decimal tolerance)
         {
-            return new CompositeReconciliationPolicy(new IReconciliationRule[]
+            return new CompositeConciliationPolicy(new IConciliationRule[]
             {
                 new ReferenceMatchRule(),
                 new DateMatchRule(),

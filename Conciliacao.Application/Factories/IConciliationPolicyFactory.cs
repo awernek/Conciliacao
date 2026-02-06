@@ -8,6 +8,6 @@ namespace Conciliacao.Application.Factories
     /// </summary>
     public interface IConciliationPolicyFactory
     {
-        IReconciliationPolicy CreateFor(Client client);
+        IConciliationPolicy CreateFor(Client client);
     }
 }

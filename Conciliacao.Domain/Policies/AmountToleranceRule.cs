@@ -1,9 +1,9 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.ValueObjects;
 
 namespace Conciliacao.Domain.Policies
 {
-    public class AmountToleranceRule : IReconciliationRule
+    public class AmountToleranceRule : IConciliationRule
     {
         private readonly decimal _tolerance;
 

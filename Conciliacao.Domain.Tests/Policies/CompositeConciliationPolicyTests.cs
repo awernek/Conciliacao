@@ -4,9 +4,9 @@ using Conciliacao.Domain.Policies;
 namespace Conciliacao.Domain.Tests.Policies
 {
     /// <summary>
-    /// Testes da política composta de conciliação (CompositeReconciliationPolicy).
+    /// Testes da política composta de conciliação (CompositeConciliationPolicy).
     /// </summary>
-    public class CompositeReconciliationPolicyTests
+    public class CompositeConciliationPolicyTests
     {
         /// <summary>
         /// Garante que IsMatch retorna true quando todas as regras da política composta são satisfeitas.
@@ -15,13 +15,13 @@ namespace Conciliacao.Domain.Tests.Policies
         public void IsMatch_Should_Return_True_When_All_Rules_Are_Satisfied()
         {
             // Preparar
-            var rules = new List<IReconciliationRule>
+            var rules = new List<IConciliationRule>
             {
                 new FakeRule(true),
                 new FakeRule(true),
                 new FakeRule(true)
             };
-            var policy = new CompositeReconciliationPolicy(rules);
+            var policy = new CompositeConciliationPolicy(rules);
             var transaction = new Transaction("", "", 0, default);
             var external = new ExternalEntry("", 0, default);
 
@@ -39,13 +39,13 @@ namespace Conciliacao.Domain.Tests.Policies
         public void IsMatch_Should_Return_False_When_Any_Rule_Is_Not_Satisfied()
         {
             // Preparar
-            var rules = new List<IReconciliationRule>
+            var rules = new List<IConciliationRule>
             {
                 new FakeRule(true),
                 new FakeRule(false),
                 new FakeRule(true)
             };
-            var policy = new CompositeReconciliationPolicy(rules);
+            var policy = new CompositeConciliationPolicy(rules);
             var transaction = new Transaction("", "", 0, default);
             var external = new ExternalEntry("", 0, default);
 

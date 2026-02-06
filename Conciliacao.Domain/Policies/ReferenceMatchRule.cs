@@ -1,8 +1,8 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Domain.Policies
 {
-    public class ReferenceMatchRule : IReconciliationRule
+    public class ReferenceMatchRule : IConciliationRule
     {
         public bool IsSatisfied(Transaction transaction, ExternalEntry externalEntry)
         {

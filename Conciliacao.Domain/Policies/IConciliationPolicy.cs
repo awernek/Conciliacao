@@ -1,8 +1,8 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 
 namespace Conciliacao.Domain.Policies
 {
-    public interface IReconciliationPolicy
+    public interface IConciliationPolicy
     {
         bool IsMatch(Transaction transaction, ExternalEntry externalEntry);
     }

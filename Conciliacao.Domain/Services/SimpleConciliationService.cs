@@ -1,23 +1,23 @@
-﻿using Conciliacao.Domain.Entities;
+using Conciliacao.Domain.Entities;
 using Conciliacao.Domain.Enums;
 using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Domain.Services
 {
-    public class SimpleReconciliationService
+    public class SimpleConciliationService
     {
-        private readonly IReconciliationPolicy _policy;
+        private readonly IConciliationPolicy _policy;
 
-        public SimpleReconciliationService(IReconciliationPolicy policy)
+        public SimpleConciliationService(IConciliationPolicy policy)
         {
             _policy = policy;
         }
 
-        public IReadOnlyCollection<ReconciliationItem> Reconcile(
+        public IReadOnlyCollection<ConciliationItem> Conciliate(
             IEnumerable<Transaction> transactions,
             IEnumerable<ExternalEntry> externalEntries)
         {
-            var results = new List<ReconciliationItem>();
+            var results = new List<ConciliationItem>();
             var matchedExternalEntries = new HashSet<ExternalEntry>();
 
             var externalByReference = externalEntries
@@ -28,26 +28,26 @@ namespace Conciliacao.Domain.Services
             {
                 if (!externalByReference.TryGetValue(transaction.Reference, out var external))
                 {
-                    results.Add(new ReconciliationItem(
+                    results.Add(new ConciliationItem(
                         transaction,
                         null,
-                        ReconciliationResult.Missing));
+                        ConciliationStatus.Missing));
                     continue;
                 }
 
                 if (_policy.IsMatch(transaction, external))
                 {
-                    results.Add(new ReconciliationItem(
+                    results.Add(new ConciliationItem(
                         transaction,
                         external,
-                        ReconciliationResult.Matched));
+                        ConciliationStatus.Matched));
                 }
                 else
                 {
-                    results.Add(new ReconciliationItem(
+                    results.Add(new ConciliationItem(
                         transaction,
                         external,
-                        ReconciliationResult.Divergent));
+                        ConciliationStatus.Divergent));
                 }
 
                 matchedExternalEntries.Add(external);
@@ -57,10 +57,10 @@ namespace Conciliacao.Domain.Services
             {
                 if (!matchedExternalEntries.Contains(external))
                 {
-                    results.Add(new ReconciliationItem(
+                    results.Add(new ConciliationItem(
                         null,
                         external,
-                        ReconciliationResult.Extra));
+                        ConciliationStatus.Extra));
                 }
             }
 

@@ -3,7 +3,7 @@ using Conciliacao.Domain.Policies;
 
 namespace Conciliacao.Domain.Tests.Policies
 {
-    public class FakeRule : IReconciliationRule
+    public class FakeRule : IConciliationRule
     {
         private readonly bool _result;
 

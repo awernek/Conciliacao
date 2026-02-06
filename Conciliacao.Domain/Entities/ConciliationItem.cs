@@ -1,21 +1,21 @@
-﻿using Conciliacao.Domain.Enums;
+using Conciliacao.Domain.Enums;
 
 namespace Conciliacao.Domain.Entities
 {
-    public class ReconciliationItem
+    public class ConciliationItem
     {
         public Transaction? Transaction { get; }
         public ExternalEntry? ExternalEntry { get; }
-        public ReconciliationResult Result { get; }
+        public ConciliationStatus Status { get; }
 
-        public ReconciliationItem(
+        public ConciliationItem(
             Transaction? transaction,
             ExternalEntry? externalEntry,
-            ReconciliationResult result)
+            ConciliationStatus status)
         {
             Transaction = transaction;
             ExternalEntry = externalEntry;
-            Result = result;
+            Status = status;
         }
     }
 }

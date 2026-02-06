@@ -43,22 +43,22 @@ namespace Conciliacao.Application.Services
             await _externalEntryRepository.AddRangeAsync(externalEntries);
 
             var policy = _factory.CreateFor(client);
-            var service = new SimpleReconciliationService(policy);
-            var items = service.Reconcile(transactions, externalEntries);
+            var service = new SimpleConciliationService(policy);
+            var items = service.Conciliate(transactions, externalEntries);
 
             var response = new ConciliationBatchResponseDto
             {
-                Missing = items.Where(i => i.Result == ReconciliationResult.Missing)
+                Missing = items.Where(i => i.Status == ConciliationStatus.Missing)
                     .Select(i => ConciliationMapper.ToDto(i.Transaction!)).ToList(),
-                Extra = items.Where(i => i.Result == ReconciliationResult.Extra)
+                Extra = items.Where(i => i.Status == ConciliationStatus.Extra)
                     .Select(i => ConciliationMapper.ToDto(i.ExternalEntry!)).ToList(),
-                Matched = items.Where(i => i.Result == ReconciliationResult.Matched)
+                Matched = items.Where(i => i.Status == ConciliationStatus.Matched)
                     .Select(i => new MatchedPairDto
                     {
                         Transaction = ConciliationMapper.ToDto(i.Transaction!),
                         ExternalEntry = ConciliationMapper.ToDto(i.ExternalEntry!)
                     }).ToList(),
-                Divergent = items.Where(i => i.Result == ReconciliationResult.Divergent)
+                Divergent = items.Where(i => i.Status == ConciliationStatus.Divergent)
                     .Select(i => new MatchedPairDto
                     {
                         Transaction = ConciliationMapper.ToDto(i.Transaction!),

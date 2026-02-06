@@ -1,463 +1,386 @@
 # Diagramas do Sistema de Conciliação Financeira
 
 > Todos os diagramas do projeto em Mermaid. Renderizam automaticamente no GitHub e GitLab.
-> Também podem ser copiados para o [Mermaid Live Editor](https://mermaid.live).
 
 ---
 
-## Diagrama 1 — Contexto Geral (System Design - Nivel 1)
+##  Diagramas de Alto Nível (Vision / System Design)
 
-Visão externa do sistema. Mostra quem interage com ele e de que forma.
-
-```mermaid
-graph TB
-    subgraph Externos["Sistemas Externos"]
-        Bank["🏦 Bancos<br/>(Extratos)"]
-        Gateway["🔌 Gateways<br/>(Pagamentos)"]
-        ERP["💼 ERP/Core<br/>(Transações)"]
-    end
-
-    subgraph Interno["Sistema de Conciliação<br/>(Sua aplicação)"]
-        API["REST API"]
-    end
-
-    subgraph Usuários["Usuários"]
-        Admin["👤 Admin"]
-        System["🤖 Sistema<br/>de Retentativa"]
-    end
-
-    Bank -->|Envia extratos| API
-    Gateway -->|Envia eventos| API
-    ERP -->|Registra transações| API
-    Admin -->|Acessa endpoints| API
-    System -->|Processa em lote| API
-    API -->|Retorna resultado<br/>Matched/Divergent/Missing/Extra| ERP
-    API -->|Registra processamento| DB[(📊 Database<br/>SQL Server)]
-
-    style Interno fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Externos fill:#f3e5f5,stroke:#7b1fa2
-    style Usuários fill:#e8f5e9,stroke:#388e3c
-```
-
----
-
-## Diagrama 2 — Fluxo de Dados de Alto Nível
-
-Mostra como os dados fluem pela aplicação: entrada → processamento → saída.
+### 1. Contexto Geral (System Design - Nível 1)
 
 ```mermaid
 graph LR
-    subgraph Entrada["📥 Entrada"]
-        TxInput["Transações<br/>(Sistema)"]
-        ExtInput["Entradas Externas<br/>(Bancos)"]
+    subgraph Fontes Externas
+        B[" Bancos"]
+        G[" Gateways"]
+        E[" ERPs"]
     end
 
-    subgraph Processamento["⚙️ Processamento"]
-        Persist["Persistir"]
-        Match["Matching<br/>(por política)"]
-        Classify["Classificar<br/>Matched/Divergent<br/>Missing/Extra"]
+    subgraph Sistema Interno
+        SI[" Sistema Interno<br/>(ERP/Core)"]
     end
 
-    subgraph Saida["📤 Saída"]
-        Response["Response JSON"]
-        Storage["Persistência<br/>no BD"]
+    subgraph Sistema de Conciliação
+        API[" ConciliationController<br/>POST /api/conciliation<br/>POST /api/conciliation/batch"]
+        APP[" Application<br/>ConciliationBatchService<br/>ConciliationService"]
+        DOM[" Domain<br/>SimpleConciliationService<br/>Policies + Rules"]
+        DB[" SQL Server"]
     end
 
-    TxInput -->|DTO| Persist
-    ExtInput -->|DTO| Persist
-    Persist -->|Entidades| Match
-    Match -->|Resultado| Classify
-    Classify -->|DTO| Response
-    Classify -->|Entities| Storage
-
-    style Entrada fill:#fff3e0
-    style Processamento fill:#f3e5f5
-    style Saida fill:#e8f5e9
+    SI -->|Transactions| API
+    B -->|ExternalEntries| API
+    G -->|ExternalEntries| API
+    E -->|ExternalEntries| API
+    API --> APP
+    APP --> DOM
+    APP --> DB
 ```
 
 ---
 
-## Diagrama 3 — Arquitetura de Containers (System Design - Nivel 2)
+### 2. Fluxo de Dados de Alto Nível
 
-Mostra os principais "containers" (componentes deployáveis) do sistema.
+```mermaid
+flowchart LR
+    subgraph Input
+        TX[" Transactions<br/>(sistema interno)"]
+        EX[" ExternalEntries<br/>(banco/gateway)"]
+    end
+
+    subgraph Processamento
+        P["1 Persistir<br/>(Repositories)"]
+        M["2 Matching<br/>(SimpleConciliationService<br/>+ Policy)"]
+        C["3 Classificar<br/>(Matched/Divergent/<br/>Missing/Extra)"]
+    end
+
+    subgraph Output
+        R[" ConciliationBatchResponseDto<br/>(JSON)"]
+    end
+
+    TX --> P
+    EX --> P
+    P --> M
+    M --> C
+    C --> R
+```
+
+---
+
+### 3. Arquitetura de Containers (System Design - Nível 2)
 
 ```mermaid
 graph TB
-    User["👤 Usuário / Sistema<br/>Externo"]
-
-    subgraph App["🖥️ Aplicação .NET"]
-        API["REST API<br/>(Kestrel)"]
-        AppLayer["Camada Application"]
-        DomainLayer["Camada Domain"]
+    subgraph ".NET App (Conciliacao)"
+        API[" Conciliacao.Api<br/>ASP.NET Core<br/>ConciliationController"]
+        APP[" Conciliacao.Application<br/>ConciliationBatchService<br/>ConciliationService<br/>Mapper / Factory"]
+        DOM[" Conciliacao.Domain<br/>Entities / Policies / Services<br/>Exceptions / ValueObjects"]
+        INFRA[" Conciliacao.Infra<br/>EF Core / UnitOfWork<br/>Repositories"]
     end
 
-    subgraph Data["💾 Persistência"]
-        DB["SQL Server<br/>(Transações,<br/>ExternalEntries,<br/>ProcessedRequests)"]
-    end
+    DB[" SQL Server<br/>Transactions, ExternalEntries,<br/>ProcessedRequests"]
 
-    User -->|HTTP<br/>POST /api/conciliation<br/>POST /api/conciliation/batch| API
-    API -->|Usa| AppLayer
-    AppLayer -->|Orquestra| DomainLayer
-    AppLayer -->|Persiste| DB
-    DomainLayer -->|Regras de negócio| AppLayer
-
-    style App fill:#bbdefb,stroke:#1976d2,stroke-width:2px
-    style Data fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    API --> APP
+    APP --> DOM
+    INFRA --> DOM
+    INFRA --> DB
 ```
 
 ---
 
-## Diagrama 4 — Dois Fluxos Principais (High-Level)
-
-Visão dos dois caminhos principais da API em paralelo.
+### 4. Dois Fluxos Principais (High-Level)
 
 ```mermaid
-graph TD
-    subgraph Idempotent["🔐 Fluxo 1: Conciliação com idempotência"]
-        I1["POST /api/conciliation"]
-        I2["Header: Idempotency-Key"]
-        I3["Garante 1 execução"]
-        I4["Response: Success + Count"]
+flowchart LR
+    subgraph "Fluxo 1: Batch"
+        B1["POST /api/conciliation/batch<br/>?clientCode=CLIENT_A"]
+        B2["ConciliationBatchService"]
+        B3["SimpleConciliationService<br/>+ CompositePolicy"]
+        B4["ConciliationBatchResponseDto<br/>Matched/Divergent/Missing/Extra"]
+        B1 --> B2 --> B3 --> B4
     end
 
-    subgraph Batch["📦 Fluxo 2: Conciliação em lote (sem idempotência)"]
-        B1["POST /api/conciliation/batch"]
-        B2["clientCode: CLIENT_A/B/C"]
-        B3["Persiste + Concilia + Commit"]
-        B4["Response: Matched/Divergent<br/>Missing/Extra"]
+    subgraph "Fluxo 2: Idempotente"
+        I1["POST /api/conciliation<br/>Idempotency-Key: KEY-X"]
+        I2["ConciliationService"]
+        I3["ProcessedRequest<br/>+ UNIQUE + DuplicateKeyException"]
+        I4["ConciliationResult<br/>Success + ProcessedCount"]
+        I1 --> I2 --> I3 --> I4
     end
-
-    subgraph Database["💾 Resultado"]
-        DB["Dados persistidos<br/>atomicamente"]
-    end
-
-    I1 --> I2 --> I3 --> I4 --> DB
-    B1 --> B2 --> B3 --> B4 --> DB
-
-    style Batch fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Idempotent fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
-    style Database fill:#bbdefb,stroke:#1976d2,stroke-width:2px
 ```
 
 ---
 
-## Diagrama 5 — Visão Geral das Camadas
+##  Diagramas Técnicos Detalhados
 
-Mostra como o projeto está organizado em 4 camadas (Clean Architecture).
+### 5. Visão Geral das Camadas
 
 ```mermaid
-flowchart TB
-    subgraph API["🌐 API (Conciliacao.Api)"]
-        direction LR
-        CC["ConciliationController<br/>POST /api/conciliation e /api/conciliation/batch"]
+graph TB
+    subgraph " API"
+        CC["ConciliationController<br/>POST /conciliation<br/>POST /conciliation/batch"]
     end
 
-    subgraph APP["Application (Conciliacao.Application)"]
-        direction LR
+    subgraph " Application"
         CBS["ConciliationBatchService"]
         CS["ConciliationService"]
-        SRS["SimpleReconciliation<br/>Service (Domain)"]
-        FAC["ConciliationPolicyFactory"]
-        MAP["ConciliationMapper"]
+        CPF["ConciliationPolicyFactory"]
+        CM["ConciliationMapper"]
     end
 
-    subgraph DOM["Domain (Conciliacao.Domain)"]
-        direction LR
-        ENT["Entidades"]
-        POL["Policies"]
-        RUL["Rules"]
-        MON["Money"]
-        SRS["SimpleReconciliation<br/>Service"]
+    subgraph " Domain"
+        SRS["SimpleConciliationService"]
+        POL["CompositeConciliationPolicy"]
+        RULES["ReferenceMatchRule<br/>DateMatchRule<br/>AmountToleranceRule"]
+        ENT["Transaction | ExternalEntry<br/>Client | ConciliationItem<br/>ProcessedRequest"]
+        DKE["DuplicateKeyException"]
+        MO["Money (Value Object)"]
+        REPO_I["ITransactionRepository<br/>IExternalEntryRepository<br/>IProcessedRequestRepository<br/>IUnitOfWork"]
     end
 
-    subgraph INFRA["Infrastructure (Conciliacao.Infra)"]
-        direction LR
-        CTX["DbContext"]
-        TXR["TransactionRepository"]
-        EXR["ExternalEntryRepository"]
-        PRR["ProcessedRequestRepository"]
-        DB[("SQL Server")]
+    subgraph " Infrastructure"
+        CTX["ConciliationDbContext"]
+        UOW["UnitOfWork<br/>(traduz exceções)"]
+        REPO["TransactionRepository<br/>ExternalEntryRepository<br/>ProcessedRequestRepository"]
     end
 
     CC --> CBS
     CC --> CS
-    CBS --> MAP
-    CBS --> FAC
+    CBS --> CM
+    CBS --> CPF
     CBS --> SRS
-    CBS --> TXR
-    CBS --> EXR
-    CS --> TXR
-    CS --> PRR
-    FAC --> POL
+    CBS --> REPO_I
+    CS --> REPO_I
+    CS -.-> DKE
+    CPF --> POL
+    POL --> RULES
+    RULES --> MO
     SRS --> POL
-    POL --> RUL
-    RUL --> MON
-    CTX --> DB
-    TXR --> CTX
-    EXR --> CTX
-    PRR --> CTX
+    SRS --> ENT
+    REPO --> REPO_I
+    UOW --> REPO_I
+    UOW -.-> DKE
+    CTX --> REPO
 ```
 
 ---
 
-## Diagrama 6 — Fluxo Batch (Da requisição à resposta)
-
-Mostra passo a passo o que acontece quando alguém chama `POST /api/conciliation/batch?clientCode=CLIENT_A`.
+### 6. Fluxo Batch (Da requisição à resposta)
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor U as Usuario
+    participant U as Usuário
     participant C as ConciliationController
-    participant A as ConciliationBatchService
+    participant S as ConciliationBatchService
     participant M as ConciliationMapper
-    participant R as Repositorios
+    participant TR as TransactionRepository
+    participant ER as ExternalEntryRepository
     participant F as ConciliationPolicyFactory
-    participant B as SimpleReconciliationService
-    participant P as IReconciliationPolicy
-    participant UW as UnitOfWork
+    participant RS as SimpleConciliationService
+    participant UoW as UnitOfWork
 
     U->>C: POST /api/conciliation/batch?clientCode=CLIENT_A
-    Note right of U: Body: transactions + externalEntries
+    C->>C: new Client(clientCode)
+    C->>S: ConciliateBatchAsync(client, txDtos, entryDtos)
 
-    C->>C: Cria objeto Client com clientCode
-    C->>A: ConciliateBatchAsync(client, transactionDTOs, externalEntryDTOs)
-
-    rect rgb(230, 245, 255)
-        Note over A,M: Etapa 1 - Mapeamento
-        A->>M: ToEntity(transactionDTOs)
-        M-->>A: Lista de Transaction (entidades)
-        A->>M: ToEntity(externalEntryDTOs)
-        M-->>A: Lista de ExternalEntry (entidades)
+    rect rgb(230, 240, 255)
+        Note over S,M: 1. Mapeamento DTO  Entity
+        S->>M: ToEntity(transactionDtos)
+        S->>M: ToEntity(externalEntryDtos)
     end
 
     rect rgb(230, 255, 230)
-        Note over A,R: Etapa 2 - Persistencia
-        A->>R: AddRangeAsync(transactions)
-        A->>R: AddRangeAsync(externalEntries)
-        Note right of R: Dados ficam em memoria (sem commit ainda!)
+        Note over S,ER: 2. Persistência
+        S->>TR: AddRangeAsync(transactions)
+        S->>ER: AddRangeAsync(externalEntries)
     end
 
     rect rgb(255, 245, 230)
-        Note over A,P: Etapa 3 - Conciliacao
-        A->>F: CreateFor(client)
-        F-->>A: CompositeReconciliationPolicy com regras do cliente
-        A->>B: Reconcile(transactions, externalEntries)
-
-        loop Para cada Transaction
-            B->>B: Busca ExternalEntry com mesma Reference
-            alt Nao encontrou referencia
-                B->>B: Classifica como MISSING
-            else Encontrou referencia
-                B->>P: IsMatch(transaction, externalEntry)
-                alt Todas as regras satisfeitas
-                    P-->>B: true - MATCHED
-                else Alguma regra falhou
-                    P-->>B: false - DIVERGENT
-                end
-            end
-        end
-        B->>B: ExternalEntries sem par = EXTRA
-        B-->>A: ReconciliationItem[] (Matched, Divergent, Missing, Extra)
+        Note over S,RS: 3. Matching
+        S->>F: CreateFor(client)
+        F-->>S: CompositePolicy(rules)
+        S->>RS: new SimpleConciliationService(policy)
+        S->>RS: Conciliate(transactions, externalEntries)
+        RS-->>S: List<ConciliationItem>
     end
 
-    rect rgb(255, 230, 255)
-        Note over A,UW: Etapa 4 - Commit
-        A->>A: Mapeia Result para ResponseDTO
-        A->>UW: CommitAsync()
-        Note right of UW: Agora sim grava tudo no banco!
+    rect rgb(240, 230, 255)
+        Note over S,M: 4. Mapeamento Entity  DTO
+        S->>M: ToDto(Matched/Divergent/Missing/Extra)
     end
 
-    A-->>C: ConciliationBatchResponseDto
-    C-->>U: 200 OK + JSON com Matched, Divergent, Missing, Extra
+    rect rgb(255, 230, 230)
+        Note over S,UoW: 5. Commit atômico
+        S->>UoW: CommitAsync()
+    end
+
+    S-->>C: ConciliationBatchResponseDto
+    C-->>U: 200 OK + JSON
 ```
 
 ---
 
-## Diagrama 7 — Fluxo Idempotente
-
-Mostra como funciona o `POST /api/conciliation` com `Idempotency-Key`.
+### 7. Fluxo Idempotente
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor U as Usuario
+    participant U as Usuário
     participant C as ConciliationController
     participant S as ConciliationService
     participant TR as TransactionRepository
     participant PR as ProcessedRequestRepository
-    participant UW as UnitOfWork
+    participant UoW as UnitOfWork
+    participant DB as SQL Server
 
-    U->>C: POST /api/conciliation
-    Note right of U: Header: Idempotency-Key = abc-123<br/>Body: items com reference e amount
+    U->>C: POST /api/conciliation<br/>Idempotency-Key: KEY-X
+    C->>S: ConciliateAsync(request, "KEY-X")
 
-    alt Header Idempotency-Key ausente
-        C-->>U: 400 Bad Request
+    alt Primeira requisição com KEY-X
+        S->>S: Cria transações a partir dos items
+        S->>TR: AddRangeAsync(transactions)
+        S->>PR: AddAsync(ProcessedRequest{KEY-X, hash})
+        S->>UoW: CommitAsync()
+        UoW->>DB: SaveChangesAsync
+        DB-->>UoW:  OK
+        S-->>C: ConciliationResult(success, count)
+    else KEY-X já existe (duplicata ou concorrência)
+        S->>UoW: CommitAsync()
+        UoW->>DB: SaveChangesAsync
+        DB-->>UoW:  UNIQUE violation
+        UoW-->>S: DuplicateKeyException
+        S->>PR: GetByKeyAsync("KEY-X")
+        PR-->>S: ProcessedRequest
+        S-->>C: ConciliationResult.FromPayload(hash)
     end
 
-    C->>S: ConciliateAsync(request, "abc-123")
-
-    S->>S: Converte items em Transaction entities
-    S->>S: Cria ConciliationResult(success, count)
-    S->>TR: AddRangeAsync(transactions)
-    S->>PR: AddAsync(ProcessedRequest com key + payload)
-    S->>UW: CommitAsync()
-
-    alt Commit com sucesso (primeira vez)
-        UW-->>S: OK
-        S-->>C: ConciliationResult (success=true)
-        C-->>U: 200 OK
-    else DbUpdateException - chave duplicada
-        Note over S,PR: Outra requisicao ja salvou com mesma key!
-        S->>PR: GetByKeyAsync("abc-123")
-        PR-->>S: ProcessedRequest ja salvo
-        S->>S: FromPayload(resultHash) - reconstroi resultado
-        S-->>C: ConciliationResult do registro anterior
-        C-->>U: 200 OK (mesmo resultado!)
-    end
+    C-->>U: 200 OK + ConciliationResult
 ```
 
 ---
 
-## Diagrama 8 — Políticas de Conciliação (Strategy + Composite)
-
-Mostra como as regras de matching são organizadas.
+### 8. Políticas de Conciliação (Strategy + Composite)
 
 ```mermaid
 classDiagram
-    direction TB
-
-    class IReconciliationPolicy {
+    class IConciliationPolicy {
         <<interface>>
         +IsMatch(Transaction, ExternalEntry) bool
     }
 
-    class CompositeReconciliationPolicy {
-        -rules : IEnumerable~IReconciliationRule~
+    class CompositeConciliationPolicy {
+        -rules: IConciliationRule[]
         +IsMatch(Transaction, ExternalEntry) bool
     }
 
-    class DefaultReconciliationPolicy {
-        -tolerance : decimal
-        +IsMatch(Transaction, ExternalEntry) bool
-    }
-
-    class IReconciliationRule {
+    class IConciliationRule {
         <<interface>>
-        +IsSatisfied(Transaction, ExternalEntry) bool
+        +IsMatch(Transaction, ExternalEntry) bool
     }
 
     class ReferenceMatchRule {
-        +IsSatisfied(Transaction, ExternalEntry) bool
+        +IsMatch(Transaction, ExternalEntry) bool
     }
 
     class DateMatchRule {
-        +IsSatisfied(Transaction, ExternalEntry) bool
+        +IsMatch(Transaction, ExternalEntry) bool
     }
 
     class AmountToleranceRule {
-        -tolerance : decimal
-        +IsSatisfied(Transaction, ExternalEntry) bool
+        -tolerance: decimal
+        +IsMatch(Transaction, ExternalEntry) bool
     }
 
     class Money {
-        <<ValueObject>>
-        +Amount : decimal
-        +Equals(Money other, decimal tolerance) bool
+        +Amount: decimal
+        +IsWithinTolerance(Money, decimal) bool
+        +Equals(Money) bool
     }
 
     class ConciliationPolicyFactory {
-        +CreateFor(Client) IReconciliationPolicy
+        +CreateFor(Client) IConciliationPolicy
     }
 
-    class Client {
-        +Code : string
-    }
-
-    IReconciliationPolicy <|.. CompositeReconciliationPolicy : implementa
-    IReconciliationPolicy <|.. DefaultReconciliationPolicy : implementa
-    CompositeReconciliationPolicy o-- IReconciliationRule : contem varias regras
-    IReconciliationRule <|.. ReferenceMatchRule : implementa
-    IReconciliationRule <|.. DateMatchRule : implementa
-    IReconciliationRule <|.. AmountToleranceRule : implementa
-    AmountToleranceRule --> Money : usa
-    ConciliationPolicyFactory --> Client : recebe
-    ConciliationPolicyFactory --> CompositeReconciliationPolicy : cria
+    IConciliationPolicy <|.. CompositeConciliationPolicy
+    IConciliationRule <|.. ReferenceMatchRule
+    IConciliationRule <|.. DateMatchRule
+    IConciliationRule <|.. AmountToleranceRule
+    CompositeConciliationPolicy o-- IConciliationRule : combina 1..*
+    AmountToleranceRule --> Money : compara via
+    ConciliationPolicyFactory ..> CompositeConciliationPolicy : cria
+    ConciliationPolicyFactory ..> IConciliationRule : seleciona
 ```
 
 ---
 
-## Diagrama 9 — Configuração por Cliente
-
-Mostra quais regras cada cliente usa.
+### 9. Configuração por Cliente
 
 ```mermaid
-flowchart LR
-    F["PolicyFactory<br/>CreateFor(client)"]
+flowchart TD
+    F["ConciliationPolicyFactory.CreateFor(client)"]
+    F --> A{client.Code?}
 
-    F -->|CLIENT_A| A["CompositePolicy"]
-    A --> A1["ReferenceMatchRule"]
-    A --> A2["DateMatchRule"]
-    A --> A3["AmountToleranceRule<br/>tolerancia: 0.05"]
+    A -->|CLIENT_A| PA["CompositePolicy"]
+    PA --> PA1[" ReferenceMatchRule"]
+    PA --> PA2[" DateMatchRule"]
+    PA --> PA3[" AmountToleranceRule(0.05)"]
 
-    F -->|CLIENT_B| B["CompositePolicy"]
-    B --> B1["ReferenceMatchRule"]
-    B --> B2["DateMatchRule"]
-    B --> B3["AmountToleranceRule<br/>tolerancia: 0.00 (exata)"]
+    A -->|CLIENT_B| PB["CompositePolicy"]
+    PB --> PB1[" ReferenceMatchRule"]
+    PB --> PB2[" DateMatchRule"]
+    PB --> PB3[" AmountToleranceRule(0.00)"]
 
-    F -->|CLIENT_C| CL["CompositePolicy"]
-    CL --> C1["ReferenceMatchRule"]
-    CL --> C3["AmountToleranceRule<br/>tolerancia: 0.10"]
+    A -->|CLIENT_C| PC["CompositePolicy"]
+    PC --> PC1[" ReferenceMatchRule"]
+    PC --> PC3[" AmountToleranceRule(0.10)"]
 
-    style A fill:#d4edda
-    style B fill:#cce5ff
-    style CL fill:#fff3cd
+    A -->|Outro| ERR[" ArgumentException"]
+
+    style PA fill:#d4edda
+    style PB fill:#cce5ff
+    style PC fill:#fff3cd
+    style ERR fill:#f8d7da
 ```
 
 ---
 
-## Diagrama 10 — Entidades do Domínio
-
-Mostra as principais entidades e seus atributos.
+### 10. Entidades do Domínio
 
 ```mermaid
 classDiagram
-    direction LR
-
     class Transaction {
-        +Id : Guid
-        +Amount : decimal
-        +Date : DateTime
-        +Reference : string
-        +ExternalReference : string
+        +Id: int
+        +ExternalReference: string
+        +Reference: string
+        +Amount: decimal
+        +Date: DateTime
     }
 
     class ExternalEntry {
-        +Id : int
-        +Amount : decimal
-        +Date : DateTime
-        +Reference : string
-        +Source : string
+        +Id: int
+        +Reference: string
+        +Amount: decimal
+        +Date: DateTime
     }
 
     class Client {
-        +Code : string
+        +Code: string
+        +Client(code: string)
     }
 
     class ProcessedRequest {
-        +Id : Guid
-        +IdempotencyKey : string
-        +ResultHash : string
-        +ProcessedAt : DateTime
+        +Id: int
+        +IdempotencyKey: string
+        +ResultHash: string
+        +ProcessedAt: DateTime
+        +ProcessedRequest(key, hash)
     }
 
-    class ReconciliationItem {
-        +Transaction : Transaction
-        +ExternalEntry : ExternalEntry
-        +Result : ReconciliationResult
+    class ConciliationItem {
+        +Transaction: Transaction?
+        +ExternalEntry: ExternalEntry?
+        +Status: ConciliationStatus
     }
 
-    class ReconciliationResult {
+    class ConciliationStatus {
         <<enumeration>>
         Matched
         Divergent
@@ -465,79 +388,75 @@ classDiagram
         Extra
     }
 
-    ReconciliationItem --> Transaction
-    ReconciliationItem --> ExternalEntry
-    ReconciliationItem --> ReconciliationResult
+    class DuplicateKeyException {
+        +DuplicateKeyException()
+        +DuplicateKeyException(message, inner)
+    }
+
+    ConciliationItem --> Transaction
+    ConciliationItem --> ExternalEntry
+    ConciliationItem --> ConciliationStatus
 ```
 
 ---
 
-## Diagrama 11 — Consistência: Unit of Work
-
-Mostra como o commit único garante atomicidade.
+### 11. Consistência: Unit of Work
 
 ```mermaid
 flowchart TD
-    REQ["Requisicao chega"]
-    MAP["Mapeia DTOs para Entidades"]
-    PERSIST["Persiste em memoria<br/>(AddRange nos repositorios)"]
-    CONCILIA["Executa conciliacao<br/>(matching por politica)"]
-    MONTA["Monta response DTO"]
+    START["ConciliationBatchService.ConciliateBatchAsync()"]
+    START --> ADD["AddRangeAsync(transactions)<br/>AddRangeAsync(externalEntries)"]
+    ADD --> MATCH["SimpleConciliationService.Conciliate()"]
+    MATCH --> MAP["ConciliationMapper.ToDto()"]
+    MAP --> COMMIT{"UnitOfWork.CommitAsync()"}
 
-    COMMIT{"CommitAsync()"}
-    OK["200 OK + Resposta JSON<br/>Dados gravados no banco"]
-    ERRO["Excecao antes do commit"]
-    NADA["Nada foi gravado!<br/>500 Internal Server Error"]
+    COMMIT -->|Sucesso| OK[" Tudo salvo no banco<br/>(um único SaveChangesAsync)"]
+    COMMIT -->|Exceção antes do commit| ROLLBACK[" Nada salvo<br/>(rollback implícito)"]
+    COMMIT -->|UNIQUE violation| DKE["DuplicateKeyException<br/>(traduzida pelo UnitOfWork)"]
 
-    REQ --> MAP --> PERSIST --> CONCILIA --> MONTA --> COMMIT
-    COMMIT -->|Sucesso| OK
-    COMMIT -->|Erro| NADA
-
-    PERSIST -.->|Qualquer erro aqui| ERRO
-    CONCILIA -.->|Qualquer erro aqui| ERRO
-    MONTA -.->|Qualquer erro aqui| ERRO
-    ERRO --> NADA
-
-    style OK fill:#d4edda,stroke:#28a745
-    style NADA fill:#f8d7da,stroke:#dc3545
+    style OK fill:#d4edda
+    style ROLLBACK fill:#f8d7da
+    style DKE fill:#fff3cd
 ```
 
 ---
 
-## Diagrama 12 — Concorrência na Idempotência
-
-Mostra o que acontece quando duas requisições idênticas chegam ao mesmo tempo.
+### 12. Concorrência na Idempotência
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor R1 as Requisicao 1
-    actor R2 as Requisicao 2
+    participant R1 as Requisição 1
+    participant R2 as Requisição 2
     participant S as ConciliationService
-    participant DB as Banco de Dados
+    participant UoW as UnitOfWork
+    participant DB as SQL Server (UNIQUE)
 
-    Note over R1,R2: Duas requisicoes simultaneas<br/>com mesma Idempotency-Key
+    Note over R1,R2: Duas requisições simultâneas com mesma Idempotency-Key
 
-    par Processamento paralelo
-        R1->>S: ConciliateAsync(request, "KEY-X")
-        S->>S: Processa e monta resultado
-        S->>DB: INSERT ProcessedRequest (KEY-X)
-    and
-        R2->>S: ConciliateAsync(request, "KEY-X")
-        S->>S: Processa e monta resultado
-        S->>DB: INSERT ProcessedRequest (KEY-X)
-    end
+    R1->>S: ConciliateAsync(req, "KEY-X")
+    R2->>S: ConciliateAsync(req, "KEY-X")
 
-    Note over DB: Indice UNIQUE em IdempotencyKey!<br/>Apenas UM insert funciona
+    S->>S: [R1] Cria transactions + ProcessedRequest
+    S->>S: [R2] Cria transactions + ProcessedRequest
 
-    DB-->>S: Requisicao 1: OK (inseriu primeiro)
-    S-->>R1: ConciliationResult original
+    S->>UoW: [R1] CommitAsync()
+    UoW->>DB: [R1] SaveChangesAsync
+    DB-->>UoW: [R1]  Inserido
 
-    DB-->>S: Requisicao 2: DbUpdateException!
-    S->>DB: SELECT ProcessedRequest WHERE Key = KEY-X
-    DB-->>S: Registro ja salvo pela Req 1
-    S->>S: FromPayload() - reconstroi resultado
-    S-->>R2: Mesmo ConciliationResult!
+    S->>UoW: [R2] CommitAsync()
+    UoW->>DB: [R2] SaveChangesAsync
+    DB-->>UoW: [R2]  UNIQUE violation (2601/2627)
+    UoW-->>S: [R2] DuplicateKeyException
 
-    Note over R1,R2: Ambas recebem o MESMO resultado<br/>Nenhuma duplicata foi criada
+    S->>DB: [R2] GetByKeyAsync("KEY-X")
+    DB-->>S: [R2] ProcessedRequest (já salvo por R1)
+
+    S-->>R1: ConciliationResult (processado)
+    S-->>R2: ConciliationResult (recuperado do banco)
+
+    Note over R1,R2: Ambas retornam o mesmo resultado 
 ```
+
+---
+
+> **Nota:** Todos os diagramas usam nomes que correspondem exatamente às classes no código-fonte atual. `CompositeConciliationPolicy` é a única implementação de política (`IConciliationPolicy`). A tradução de exceções SQL  `DuplicateKeyException` é feita pelo `UnitOfWork` na infraestrutura.

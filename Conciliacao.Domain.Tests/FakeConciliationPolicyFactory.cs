@@ -6,9 +6,9 @@ namespace Conciliacao.Domain.Tests
 {
     public class FakeConciliationPolicyFactory : IConciliationPolicyFactory
     {
-        public IReconciliationPolicy CreateFor(Client client)
+        public IConciliationPolicy CreateFor(Client client)
         {
-            return new CompositeReconciliationPolicy(new IReconciliationRule[]
+            return new CompositeConciliationPolicy(new IConciliationRule[]
             {
                 new ReferenceMatchRule(),
                 new DateMatchRule(),

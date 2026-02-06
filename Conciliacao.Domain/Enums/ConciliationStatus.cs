@@ -1,6 +1,6 @@
-﻿namespace Conciliacao.Domain.Enums
+namespace Conciliacao.Domain.Enums
 {
-    public enum ReconciliationResult
+    public enum ConciliationStatus
     {
         Matched,
         Divergent,
