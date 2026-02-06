@@ -1,6 +1,5 @@
 using Conciliacao.Application.Requests;
 using Conciliacao.Application.Results;
-using Conciliacao.Application.Services;
 using Conciliacao.Domain.Repositories;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
