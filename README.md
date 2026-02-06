@@ -242,14 +242,17 @@ Conciliacao/
 
 ### Instalação e execução
 
-```bash
-git clone https://github.com/awernek/Conciliacao.git
-cd Conciliacao
-dotnet build
-dotnet test
-```
+### Opção 1: Docker (Recomendado)
 
-Configure a connection string **DefaultConnection** em `appsettings.json` (ou `appsettings.Development.json`) para o ambiente desejado. Em ambiente **Testing**, a API usa fakes (não precisa de banco).
+```bash
+docker compose up --build -d
+```
+Acesse: `http://localhost:5000/swagger`
+
+### Opção 2: Manual (.NET CLI)
+
+Configure a connection string **DefaultConnection** em `appsettings.json`.
+
 
 ```bash
 dotnet run --project Conciliacao.Api
@@ -288,18 +291,14 @@ Acesse o Swagger (ex.: `https://localhost:5xxx/swagger`).
 }
 ```
 
-##  Decisões de Design
+##  Decisões de Design (ADRs)
 
-| Decisão | Motivação |
-|---------|-----------|
-| **Controller único** | `ConciliationController` unifica ambos os fluxos (batch + idempotente) sob `/api/conciliation`, simplificando a API. |
-| **Um commit por batch** | ConciliationBatchService persiste tudo, concilia e mapeia; CommitAsync() só no final. Falha antes = nada gravado. |
-| **UnitOfWork dedicado** | Classe `UnitOfWork` (Infra) implementa `IUnitOfWork` e traduz exceções SQL  domínio (`DuplicateKeyException`), mantendo Application limpa. |
-| **Política por cliente (Factory)** | `ConciliationPolicyFactory` + `CompositeReconciliationPolicy` permitem regras/tolerâncias diferentes por cliente sem alterar o fluxo. |
-| **SimpleReconciliationService no Domain** | Lógica de matching pura no domínio; Application apenas orquestra persistência, factory e mapeamento. |
-| **DuplicateKeyException (Domain)** | Exceção de domínio para violação de chave única. UnitOfWork (Infra) traduz DbUpdateException  DuplicateKeyException, eliminando dependência de EF Core na Application. |
-| **ProcessedRequest + UNIQUE** | Idempotência e tratamento de concorrência (apenas uma inserção por chave; demais capturam `DuplicateKeyException` e retornam resultado já salvo). |
-| **Client encapsulado** | Construtor com guarda de null; setter privado. Protege invariantes de domínio. |
+As decisões arquiteturais estão formalizadas em `docs/adr/`:
+
+- [001 - Adotar Clean Architecture](docs/adr/001-adotar-clean-architecture.md)
+- [002 - Estratégia de Idempotência](docs/adr/002-estrategia-de-idempotencia.md)
+- [003 - Políticas por Cliente](docs/adr/003-politicas-por-cliente.md)
+- [004 - Persistência em Lote](docs/adr/004-persistencia-em-lote.md)
 
 ##  Documentação Adicional
 
@@ -336,13 +335,7 @@ Este projeto está licenciado sob a Licença MIT  veja o arquivo LICENSE para de
 
 ##  Contribuindo
 
-Contribuições são bem-vindas. Abra uma issue ou envie um pull request.
-
-1. Fork o projeto
-2. Crie sua branch (`git checkout -b feature/MinhaFeature`)
-3. Commit (`git commit -m 'Add: MinhaFeature'`)
-4. Push (`git push origin feature/MinhaFeature`)
-5. Abra um Pull Request
+Leia nosso [Guia de Contribuição](CONTRIBUTING.md) para detalhes sobre setup, testes e processo de PR.
 
 ---
 
